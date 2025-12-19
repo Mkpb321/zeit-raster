@@ -33,14 +33,14 @@ html, body{
   flex-direction:column;
 }
 
-/* Sehr klein halten, damit der Kalender den Platz bekommt */
+/* Toolbar minimal halten */
 .toolbar{
   border-bottom:1px solid var(--line);
   padding:6px 8px;
   background:var(--bg);
   display:flex;
   align-items:center;
-  gap:12px;
+  gap:10px;
 }
 
 .swatches{
@@ -63,6 +63,25 @@ html, body{
   outline-offset:2px;
 }
 
+.tool-btn{
+  width:28px;
+  height:22px;
+  border:1px solid var(--line);
+  background:var(--bg);
+  cursor:pointer;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:14px;
+  line-height:1;
+  padding:0;
+}
+
+.tool-btn[aria-pressed="true"]{
+  outline:2px solid var(--line);
+  outline-offset:2px;
+}
+
 .clear-all{
   margin-left:auto;
   border:1px solid var(--line);
@@ -76,11 +95,12 @@ html, body{
   transform: translateY(1px);
 }
 
+/* Nur vertikal scrollen */
 .scroller{
   flex:1;
   width:100%;
   overflow-y:auto;
-  overflow-x:hidden; /* kein horizontal scrollen */
+  overflow-x:hidden;
   background:var(--bg);
 }
 
@@ -137,6 +157,7 @@ html, body{
   font-size: clamp(9px, 1.2vw, 12px);
   line-height:1;
   background:var(--bg);
+  position: relative; /* für Notiz-Punkt */
 }
 
 /* Sa/So-Spalten */
@@ -145,22 +166,102 @@ html, body{
 }
 
 .day-cell.empty{
-  color: transparent; /* bleibt leer */
+  color: transparent;
 }
 
-/* Heute: nur Umrandung, keine Füllung */
+/* Heute: nur Umrandung */
 .day-cell.today{
   box-shadow: inset 0 0 0 2px var(--line);
 }
 
-/* Marker: überschreiben Grundhintergründe (auch weekend) */
-.day-cell.has-marker{ }
-
+/* Markerfarben */
 .day-cell.marker-yellow{ background: var(--m-yellow); }
 .day-cell.marker-green{  background: var(--m-green);  }
 .day-cell.marker-blue{   background: var(--m-blue);   }
 .day-cell.marker-red{    background: var(--m-red);    }
 .day-cell.marker-purple{ background: var(--m-purple); }
+
+/* Notiz-Indikator: fetter Punkt unten rechts */
+.day-cell.has-note::after{
+  content: "•";
+  position:absolute;
+  right:4px;
+  bottom:1px;
+  font-weight:900;
+  font-size:14px;
+  line-height:1;
+  color:#000;
+}
+
+/* Modal (Notiz) – minimal */
+.modal{
+  position: fixed;
+  inset: 0;
+  background: rgba(255,255,255,0.6);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding: 12px;
+}
+
+/* WICHTIG: hidden muss wirklich ausblenden */
+.modal[hidden]{
+  display:none !important;
+}
+
+.modal-card{
+  width: min(420px, 100%);
+  border: 1px solid var(--line);
+  background: var(--bg);
+  padding: 10px;
+}
+
+.modal-head{
+  display:flex;
+  justify-content:space-between;
+  align-items:baseline;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.modal-title{
+  font-weight:700;
+  font-size: 13px;
+}
+
+.modal-date{
+  font-size: 12px;
+}
+
+.modal-text{
+  width:100%;
+  border:1px solid var(--line);
+  padding: 8px;
+  font-size: 12px;
+  font-family: inherit;
+  resize: vertical;
+  background: var(--bg);
+  color: #000;
+}
+
+.modal-actions{
+  display:flex;
+  justify-content:flex-end;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.modal-btn{
+  border:1px solid var(--line);
+  background: var(--bg);
+  padding: 4px 8px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.modal-btn.primary{
+  font-weight: 700;
+}
 
 /* Sentinel */
 .sentinel{ height:1px; }

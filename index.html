@@ -8,10 +8,20 @@
 </head>
 <body>
   <main class="app">
-    <header class="toolbar" aria-label="Marker-Auswahl">
-      <div class="swatches" id="swatches" role="radiogroup" aria-label="Markerfarben">
-        <!-- Buttons werden in app.js erzeugt -->
-      </div>
+    <header class="toolbar" aria-label="Werkzeuge">
+      <div class="swatches" id="swatches" role="radiogroup" aria-label="Markerfarben"></div>
+
+      <button
+        id="penTool"
+        type="button"
+        class="tool-btn"
+        aria-pressed="false"
+        title="Stift (Notiz hinzufügen/bearbeiten)"
+      >✎</button>
+
+      <button id="clearAll" type="button" class="clear-all" title="Löscht alle Farben (Notizen bleiben)">
+        Clear all
+      </button>
     </header>
 
     <div id="scroller" class="scroller" aria-label="Kalender-Scroller">
@@ -20,6 +30,23 @@
       <div id="sentinel-bottom" class="sentinel" aria-hidden="true"></div>
     </div>
   </main>
+
+  <!-- Minimaler Notiz-Dialog -->
+  <div id="noteModal" class="modal" hidden aria-hidden="true">
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="noteTitle">
+      <div class="modal-head">
+        <div id="noteTitle" class="modal-title">Notiz</div>
+        <div id="noteDate" class="modal-date"></div>
+      </div>
+
+      <textarea id="noteText" class="modal-text" rows="6" spellcheck="false"></textarea>
+
+      <div class="modal-actions">
+        <button id="noteCancel" type="button" class="modal-btn">Abbrechen</button>
+        <button id="noteSave" type="button" class="modal-btn primary">Speichern</button>
+      </div>
+    </div>
+  </div>
 
   <script src="app.js"></script>
 </body>

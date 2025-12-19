@@ -1,15 +1,16 @@
 (() => {
   /**
    * Monats-Zeilen Kalender:
-   * - Spalten sind fortlaufende Wochentage (Mo..So), Anzahl = lead (0..6) + max 31 Tage = 37
-   * - Zeilen sind Monate
-   * - Kein horizontales Scrollen (Spalten sind fr)
-   * - Marker: Farbe wählen, Feld klicken => einfärben; gleiches nochmal => zurücksetzen
-   * - Persistenz via localStorage
-   * - Clear all: löscht alle Marker
+   * - Spalten: fortlaufende Wochentage (Mo..So), Anzahl = lead (0..6) + max 31 Tage = 37
+   * - Zeilen: Monate
+   * - Markerfarben per Klick (toggle)
+   * - Shift+Klick: Range einfärben (inkl. beide Endpunkte, inkl. schon gefärbte Felder)
+   * - Stift-Tool: Notiz hinzufügen/bearbeiten; leer speichern => löschen
+   * - Notiz: Tooltip + Punkt unten rechts
+   * - Clear all löscht nur Farben (Notizen bleiben)
    */
 
-  const COLS = 37;               // lead + max 31 Tage
+  const COLS = 37;
   const CHUNK_YEARS = 2;
   const INITIAL_YEARS_BEFORE = 2;
   const INITIAL_YEARS_AFTER = 2;
@@ -24,11 +25,18 @@
     { id: "purple",  label: "Lila",   className: "marker-purple",  cssVar: "--m-purple"  },
   ];
 
-  const STORAGE_KEY = "calendarMarkersV1";
+  const STORAGE_MARKERS = "calendarMarkersV2";
+  const STORAGE_NOTES = "calendarNotesV1";
+
+  let mode = "color"; // "color" | "pen"
+  let selectedMarkerId = MARKERS[0].id;
+
+  // Anker für Shift-Range (Farbmodus)
+  let rangeAnchorKey = null;
 
   // Weekend-Spalten: Sa/So
   const isWeekendColumn = (colIndex) => {
-    const wd = colIndex % 7;   // 0=Mo ... 5=Sa 6=So
+    const wd = colIndex % 7; // 0=Mo ... 5=Sa 6=So
     return (wd === 5 || wd === 6);
   };
 
@@ -40,11 +48,31 @@
   const ymd = (date) => `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
   const daysInMonth = (year, month0) => new Date(year, month0 + 1, 0).getDate();
 
+  const parseYMDToNoon = (key) => {
+    const [y, m, d] = key.split("-").map(Number);
+    return makeLocalNoon(y, m - 1, d);
+  };
+
+  const addDaysNoon = (date, days) => {
+    const d = new Date(date.getTime());
+    d.setDate(d.getDate() + days);
+    return makeLocalNoon(d.getFullYear(), d.getMonth(), d.getDate());
+  };
+
   const scroller = document.getElementById("scroller");
   const calendarEl = document.getElementById("calendar");
   const sentinelTop = document.getElementById("sentinel-top");
   const sentinelBottom = document.getElementById("sentinel-bottom");
   const swatchesEl = document.getElementById("swatches");
+  const clearAllBtn = document.getElementById("clearAll");
+  const penToolBtn = document.getElementById("penTool");
+
+  // Modal elements
+  const noteModal = document.getElementById("noteModal");
+  const noteDateEl = document.getElementById("noteDate");
+  const noteTextEl = document.getElementById("noteText");
+  const noteSaveBtn = document.getElementById("noteSave");
+  const noteCancelBtn = document.getElementById("noteCancel");
 
   // Heute (lokal)
   const now = new Date();
@@ -57,37 +85,34 @@
   // CSS cols setzen
   document.documentElement.style.setProperty("--cols", String(COLS));
 
-  // --------- Marker State / Storage ----------
-  const loadMarkerMap = () => {
+  // ---------- Storage ----------
+  const safeLoad = (key) => {
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
+      const raw = localStorage.getItem(key);
       if (!raw) return {};
       const obj = JSON.parse(raw);
-      if (obj && typeof obj === "object") return obj;
-      return {};
+      return (obj && typeof obj === "object") ? obj : {};
     } catch {
       return {};
     }
   };
 
-  const saveMarkerMap = (map) => {
+  const safeSave = (key, obj) => {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(map));
+      localStorage.setItem(key, JSON.stringify(obj));
     } catch {
-      // falls Storage blockiert ist: ohne Persistenz weiter
+      // ignore
     }
   };
 
-  let markerMap = loadMarkerMap(); // { "YYYY-MM-DD": "yellow" | ... }
-
-  // Aktuell ausgewählte Farbe
-  let selectedMarkerId = MARKERS[0].id;
+  let markerMap = safeLoad(STORAGE_MARKERS); // { "YYYY-MM-DD": "yellow" | ... }
+  let noteMap = safeLoad(STORAGE_NOTES);     // { "YYYY-MM-DD": "text..." }
 
   const markerById = (id) => MARKERS.find(m => m.id === id) || null;
 
+  // ---------- Apply helpers ----------
   const applyMarkerToCell = (cell, markerIdOrNull) => {
     for (const m of MARKERS) cell.classList.remove(m.className);
-    cell.classList.remove("has-marker");
     delete cell.dataset.marker;
 
     if (!markerIdOrNull) return;
@@ -95,13 +120,33 @@
     const m = markerById(markerIdOrNull);
     if (!m) return;
 
-    cell.classList.add("has-marker");
     cell.classList.add(m.className);
     cell.dataset.marker = markerIdOrNull;
   };
 
-  // --------- Swatches UI + Clear all ----------
-  const renderSwatchesAndClear = () => {
+  const formatTooltip = (text) => String(text).replace(/\s*\n+\s*/g, " / ").trim();
+
+  const applyNoteToCell = (cell, noteTextOrNull) => {
+    cell.classList.remove("has-note");
+    delete cell.dataset.note;
+
+    if (!noteTextOrNull) {
+      cell.removeAttribute("title");
+      return;
+    }
+
+    cell.classList.add("has-note");
+    cell.dataset.note = noteTextOrNull;
+    cell.setAttribute("title", formatTooltip(noteTextOrNull));
+  };
+
+  // ---------- Swatches ----------
+  const setMode = (newMode) => {
+    mode = newMode;
+    penToolBtn.setAttribute("aria-pressed", String(mode === "pen"));
+  };
+
+  const renderSwatches = () => {
     swatchesEl.innerHTML = "";
 
     for (const m of MARKERS) {
@@ -121,29 +166,79 @@
           child.setAttribute("aria-checked", "false");
         }
         btn.setAttribute("aria-checked", "true");
+        setMode("color");
       });
 
       swatchesEl.appendChild(btn);
     }
-
-    const clearBtn = document.createElement("button");
-    clearBtn.type = "button";
-    clearBtn.className = "clear-all";
-    clearBtn.textContent = "Clear all";
-    clearBtn.addEventListener("click", () => clearAllMarkers());
-    swatchesEl.parentElement.appendChild(clearBtn);
   };
 
-  const clearAllMarkers = () => {
+  // ---------- Clear all (nur Farben) ----------
+  const clearAllColors = () => {
     markerMap = {};
-    saveMarkerMap(markerMap);
+    safeSave(STORAGE_MARKERS, markerMap);
 
-    // Alle sichtbaren Marker entfernen
-    const marked = calendarEl.querySelectorAll(".day-cell.has-marker");
-    for (const cell of marked) applyMarkerToCell(cell, null);
+    const anyMarked = calendarEl.querySelectorAll(".day-cell[data-marker]");
+    for (const cell of anyMarked) {
+      applyMarkerToCell(cell, null);
+    }
   };
 
-  // --------- Kalender Rendering ----------
+  // ---------- Modal (Notes) ----------
+  let editingDateKey = null;
+  let editingCell = null;
+
+  const openNoteModal = (dateKey, cell) => {
+    editingDateKey = dateKey;
+    editingCell = cell;
+
+    noteDateEl.textContent = dateKey;
+    noteTextEl.value = noteMap[dateKey] || "";
+
+    noteModal.hidden = false;
+    noteModal.setAttribute("aria-hidden", "false");
+    setTimeout(() => noteTextEl.focus(), 0);
+  };
+
+  const closeNoteModal = () => {
+    noteModal.hidden = true;
+    noteModal.setAttribute("aria-hidden", "true");
+    editingDateKey = null;
+    editingCell = null;
+  };
+
+  const saveNoteFromModal = () => {
+    if (!editingDateKey || !editingCell) return;
+
+    const raw = noteTextEl.value ?? "";
+    const trimmed = raw.trim();
+
+    if (trimmed.length === 0) {
+      delete noteMap[editingDateKey];
+      safeSave(STORAGE_NOTES, noteMap);
+      applyNoteToCell(editingCell, null);
+      closeNoteModal();
+      return;
+    }
+
+    noteMap[editingDateKey] = raw;
+    safeSave(STORAGE_NOTES, noteMap);
+    applyNoteToCell(editingCell, raw);
+    closeNoteModal();
+  };
+
+  noteModal.addEventListener("click", (e) => {
+    if (e.target === noteModal) closeNoteModal();
+  });
+  noteCancelBtn.addEventListener("click", closeNoteModal);
+  noteSaveBtn.addEventListener("click", saveNoteFromModal);
+
+  window.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !noteModal.hidden) closeNoteModal();
+    if ((e.ctrlKey || e.metaKey) && e.key === "Enter" && !noteModal.hidden) saveNoteFromModal();
+  });
+
+  // ---------- Rendering ----------
   let minYear = null;
   let maxYear = null;
 
@@ -201,8 +296,11 @@
 
           if (key === todayKey) cell.classList.add("today");
 
-          const stored = markerMap[key];
-          if (stored) applyMarkerToCell(cell, stored);
+          const storedMarker = markerMap[key];
+          if (storedMarker) applyMarkerToCell(cell, storedMarker);
+
+          const storedNote = noteMap[key];
+          if (storedNote) applyNoteToCell(cell, storedNote);
         }
 
         row.appendChild(cell);
@@ -260,7 +358,6 @@
     const io = new IntersectionObserver((entries) => {
       for (const e of entries) {
         if (!e.isIntersecting) continue;
-
         if (e.target === sentinelTop) prependYears(CHUNK_YEARS);
         else if (e.target === sentinelBottom) appendYears(CHUNK_YEARS);
       }
@@ -270,7 +367,31 @@
     io.observe(sentinelBottom);
   };
 
-  // --------- Interaktion: Klick zum Markieren ----------
+  // ---------- Range-Apply (Shift) ----------
+  const applyColorRange = (fromKey, toKey, markerId) => {
+    const start = parseYMDToNoon(fromKey);
+    const end = parseYMDToNoon(toKey);
+
+    const forward = start.getTime() <= end.getTime();
+    let cur = forward ? start : end;
+    const last = forward ? end : start;
+
+    while (cur.getTime() <= last.getTime()) {
+      const key = ymd(cur);
+
+      markerMap[key] = markerId;
+
+      // Wenn Zelle gerendert ist, direkt updaten
+      const cell = calendarEl.querySelector(`.day-cell[data-date="${key}"]`);
+      if (cell) applyMarkerToCell(cell, markerId);
+
+      cur = addDaysNoon(cur, 1);
+    }
+
+    safeSave(STORAGE_MARKERS, markerMap);
+  };
+
+  // ---------- Interaktion: Klick auf Kalender ----------
   const onCalendarClick = (ev) => {
     const cell = ev.target.closest(".day-cell");
     if (!cell) return;
@@ -279,25 +400,49 @@
     const dateKey = cell.dataset.date;
     if (!dateKey) return;
 
-    const current = cell.dataset.marker || null;
+    if (mode === "pen") {
+      openNoteModal(dateKey, cell);
+      return;
+    }
+
+    // mode === "color"
     const selected = selectedMarkerId;
+
+    // Shift+Click: Range einfärben
+    if (ev.shiftKey && rangeAnchorKey) {
+      applyColorRange(rangeAnchorKey, dateKey, selected);
+      rangeAnchorKey = dateKey; // Anker aktualisieren
+      return;
+    }
+
+    // Normaler Click: Toggle einzelnes Feld
+    const current = cell.dataset.marker || null;
 
     if (current === selected) {
       applyMarkerToCell(cell, null);
       delete markerMap[dateKey];
-      saveMarkerMap(markerMap);
-      return;
+      safeSave(STORAGE_MARKERS, markerMap);
+    } else {
+      applyMarkerToCell(cell, selected);
+      markerMap[dateKey] = selected;
+      safeSave(STORAGE_MARKERS, markerMap);
     }
 
-    applyMarkerToCell(cell, selected);
-    markerMap[dateKey] = selected;
-    saveMarkerMap(markerMap);
+    // Anker setzen/aktualisieren
+    rangeAnchorKey = dateKey;
   };
 
-  // --------- Start ----------
+  // ---------- Start ----------
   const init = () => {
-    // Toolbar: Swatches + Clear all Button
-    renderSwatchesAndClear();
+    renderSwatches();
+
+    clearAllBtn.addEventListener("click", clearAllColors);
+
+    penToolBtn.addEventListener("click", () => {
+      setMode(mode === "pen" ? "color" : "pen");
+    });
+
+    setMode("color");
 
     minYear = todayYear - INITIAL_YEARS_BEFORE;
     maxYear = todayYear + INITIAL_YEARS_AFTER;
