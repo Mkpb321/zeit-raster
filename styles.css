@@ -1,0 +1,113 @@
+:root{
+  --line:#000;
+  --bg:#fff;
+  --weekend:#f0f0f0;
+  --today:#fff3b0;
+
+  /* Layout */
+  --label-w: 72px;     /* Monat/Jahr-Spalte */
+  --cols: 42;          /* 6 Wochen * 7 Tage */
+  --cell-h: 28px;      /* Zellenhöhe */
+}
+
+*{ box-sizing:border-box; }
+
+html, body{
+  height:100%;
+  margin:0;
+  background:var(--bg);
+  color:#000;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+}
+
+/* Vollbild, möglichst viel Fläche für den Kalender */
+.app{
+  height:100%;
+  width:100%;
+}
+
+/* Nur vertikal scrollen; keine horizontale Scrollbar */
+.scroller{
+  height:100%;
+  width:100%;
+  overflow-y:auto;
+  overflow-x:hidden;
+  background:var(--bg);
+}
+
+/* Container: keine “Deko”, nur ein wenig Luft zum Rand */
+.calendar{
+  width:100%;
+  padding:8px;
+}
+
+/* Ein Jahrblock */
+.year{
+  width:100%;
+  border-right:1px solid var(--line);
+  border-bottom:1px solid var(--line);
+  margin-bottom:10px;
+}
+
+/* Zeilen: Jahr-Header + Monatszeilen */
+.year-header,
+.month-row{
+  display:grid;
+  grid-template-columns: var(--label-w) repeat(var(--cols), minmax(0, 1fr));
+}
+
+/* Linke Beschriftungszelle (Jahr / Monat) */
+.label-cell{
+  border-left:1px solid var(--line);
+  border-top:1px solid var(--line);
+  padding:6px 8px;
+  font-weight:600;
+  background:var(--bg);
+  font-size: 12px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+/* Header-Zellen (Wochentage) */
+.header-cell{
+  border-left:1px solid var(--line);
+  border-top:1px solid var(--line);
+  height: var(--cell-h);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size: 11px;
+  user-select:none;
+  background: var(--bg);
+}
+
+/* Tageszellen */
+.day-cell{
+  border-left:1px solid var(--line);
+  border-top:1px solid var(--line);
+  height: var(--cell-h);
+  padding:4px 6px;
+  font-size: clamp(9px, 1.2vw, 12px);
+  line-height: 1;
+  background: var(--bg);
+}
+
+/* Sa/So-Spalten (auch in leeren Zellen) */
+.weekend-col{
+  background: var(--weekend);
+}
+
+/* Leere Zellen: behalten Grid und Weekend-Färbung, aber ohne sichtbare Zahl */
+.day-cell.empty{
+  color: transparent;
+}
+
+/* Heutiger Tag */
+.day-cell.today{
+  background: var(--today);
+}
+
+/* Sentinel für Infinite Scroll */
+.sentinel{
+  height: 1px;
+}

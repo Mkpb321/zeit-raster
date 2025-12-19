@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Kalender Übersicht</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="app">
+    <div id="scroller" class="scroller" aria-label="Kalender-Scroller">
+      <div id="sentinel-top" class="sentinel" aria-hidden="true"></div>
+
+      <section id="calendar" class="calendar" aria-label="Kalender (Monate als Zeilen)"></section>
+
+      <div id="sentinel-bottom" class="sentinel" aria-hidden="true"></div>
+    </div>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
