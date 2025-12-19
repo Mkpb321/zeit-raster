@@ -4,7 +4,8 @@
    * - Spalten: fortlaufende Wochentage (Mo..So), Anzahl = lead (0..6) + max 31 Tage = 37
    * - Zeilen: Monate
    * - Markerfarben per Klick (toggle)
-   * - Shift+Klick: Range einfärben (inkl. beide Endpunkte, inkl. schon gefärbte Felder)
+   * - Shift+Klick (Farbmodus): Range einfärben
+   * - Radierer-Tool: Klick löscht Farbe; Shift+Klick löscht Range (inkl. Endpunkte)
    * - Stift-Tool: Notiz hinzufügen/bearbeiten; leer speichern => löschen
    * - Notiz: Tooltip + Punkt unten rechts
    * - Clear all löscht nur Farben (Notizen bleiben)
@@ -28,10 +29,11 @@
   const STORAGE_MARKERS = "calendarMarkersV2";
   const STORAGE_NOTES = "calendarNotesV1";
 
-  let mode = "color"; // "color" | "pen"
+  // Tools / Mode
+  let mode = "color"; // "color" | "pen" | "erase"
   let selectedMarkerId = MARKERS[0].id;
 
-  // Anker für Shift-Range (Farbmodus)
+  // Anker für Shift-Range (Farbmodus + Radierer)
   let rangeAnchorKey = null;
 
   // Weekend-Spalten: Sa/So
@@ -66,6 +68,7 @@
   const swatchesEl = document.getElementById("swatches");
   const clearAllBtn = document.getElementById("clearAll");
   const penToolBtn = document.getElementById("penTool");
+  const eraserToolBtn = document.getElementById("eraserTool");
 
   // Modal elements
   const noteModal = document.getElementById("noteModal");
@@ -140,12 +143,14 @@
     cell.setAttribute("title", formatTooltip(noteTextOrNull));
   };
 
-  // ---------- Swatches ----------
+  // ---------- Mode ----------
   const setMode = (newMode) => {
     mode = newMode;
     penToolBtn.setAttribute("aria-pressed", String(mode === "pen"));
+    eraserToolBtn.setAttribute("aria-pressed", String(mode === "erase"));
   };
 
+  // ---------- Swatches ----------
   const renderSwatches = () => {
     swatchesEl.innerHTML = "";
 
@@ -166,6 +171,8 @@
           child.setAttribute("aria-checked", "false");
         }
         btn.setAttribute("aria-checked", "true");
+
+        // Farbauswahl => Farbmodus
         setMode("color");
       });
 
@@ -367,27 +374,36 @@
     io.observe(sentinelBottom);
   };
 
-  // ---------- Range-Apply (Shift) ----------
-  const applyColorRange = (fromKey, toKey, markerId) => {
-    const start = parseYMDToNoon(fromKey);
-    const end = parseYMDToNoon(toKey);
+  // ---------- Range Apply ----------
+  const iterateRange = (fromKey, toKey, fn) => {
+    const a = parseYMDToNoon(fromKey);
+    const b = parseYMDToNoon(toKey);
 
-    const forward = start.getTime() <= end.getTime();
-    let cur = forward ? start : end;
-    const last = forward ? end : start;
+    const forward = a.getTime() <= b.getTime();
+    let cur = forward ? a : b;
+    const last = forward ? b : a;
 
     while (cur.getTime() <= last.getTime()) {
-      const key = ymd(cur);
-
-      markerMap[key] = markerId;
-
-      // Wenn Zelle gerendert ist, direkt updaten
-      const cell = calendarEl.querySelector(`.day-cell[data-date="${key}"]`);
-      if (cell) applyMarkerToCell(cell, markerId);
-
+      fn(ymd(cur));
       cur = addDaysNoon(cur, 1);
     }
+  };
 
+  const applyColorRange = (fromKey, toKey, markerId) => {
+    iterateRange(fromKey, toKey, (key) => {
+      markerMap[key] = markerId;
+      const cell = calendarEl.querySelector(`.day-cell[data-date="${key}"]`);
+      if (cell) applyMarkerToCell(cell, markerId);
+    });
+    safeSave(STORAGE_MARKERS, markerMap);
+  };
+
+  const eraseColorRange = (fromKey, toKey) => {
+    iterateRange(fromKey, toKey, (key) => {
+      if (markerMap[key] !== undefined) delete markerMap[key];
+      const cell = calendarEl.querySelector(`.day-cell[data-date="${key}"]`);
+      if (cell) applyMarkerToCell(cell, null);
+    });
     safeSave(STORAGE_MARKERS, markerMap);
   };
 
@@ -400,18 +416,35 @@
     const dateKey = cell.dataset.date;
     if (!dateKey) return;
 
+    // Pen: Notiz bearbeiten
     if (mode === "pen") {
       openNoteModal(dateKey, cell);
       return;
     }
 
-    // mode === "color"
+    // Eraser: Farben löschen (Range möglich)
+    if (mode === "erase") {
+      if (ev.shiftKey && rangeAnchorKey) {
+        eraseColorRange(rangeAnchorKey, dateKey);
+        rangeAnchorKey = dateKey;
+        return;
+      }
+
+      // Single erase
+      if (markerMap[dateKey] !== undefined) delete markerMap[dateKey];
+      applyMarkerToCell(cell, null);
+      safeSave(STORAGE_MARKERS, markerMap);
+
+      rangeAnchorKey = dateKey;
+      return;
+    }
+
+    // Color mode
     const selected = selectedMarkerId;
 
-    // Shift+Click: Range einfärben
     if (ev.shiftKey && rangeAnchorKey) {
       applyColorRange(rangeAnchorKey, dateKey, selected);
-      rangeAnchorKey = dateKey; // Anker aktualisieren
+      rangeAnchorKey = dateKey;
       return;
     }
 
@@ -428,7 +461,6 @@
       safeSave(STORAGE_MARKERS, markerMap);
     }
 
-    // Anker setzen/aktualisieren
     rangeAnchorKey = dateKey;
   };
 
@@ -440,6 +472,10 @@
 
     penToolBtn.addEventListener("click", () => {
       setMode(mode === "pen" ? "color" : "pen");
+    });
+
+    eraserToolBtn.addEventListener("click", () => {
+      setMode(mode === "erase" ? "color" : "erase");
     });
 
     setMode("color");
