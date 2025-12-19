@@ -6,6 +6,7 @@
    * - Kein horizontales Scrollen (Spalten sind fr)
    * - Marker: Farbe wählen, Feld klicken => einfärben; gleiches nochmal => zurücksetzen
    * - Persistenz via localStorage
+   * - Clear all: löscht alle Marker
    */
 
   const COLS = 37;               // lead + max 31 Tage
@@ -73,7 +74,7 @@
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(map));
     } catch {
-      // falls Storage blockiert ist: einfach ohne Persistenz weiter
+      // falls Storage blockiert ist: ohne Persistenz weiter
     }
   };
 
@@ -85,7 +86,6 @@
   const markerById = (id) => MARKERS.find(m => m.id === id) || null;
 
   const applyMarkerToCell = (cell, markerIdOrNull) => {
-    // vorherige Marker-Klassen entfernen
     for (const m of MARKERS) cell.classList.remove(m.className);
     cell.classList.remove("has-marker");
     delete cell.dataset.marker;
@@ -100,8 +100,8 @@
     cell.dataset.marker = markerIdOrNull;
   };
 
-  // --------- Swatches UI ----------
-  const renderSwatches = () => {
+  // --------- Swatches UI + Clear all ----------
+  const renderSwatchesAndClear = () => {
     swatchesEl.innerHTML = "";
 
     for (const m of MARKERS) {
@@ -112,12 +112,11 @@
       btn.setAttribute("aria-label", m.label);
       btn.setAttribute("aria-checked", String(m.id === selectedMarkerId));
 
-      // Hintergrundfarbe aus CSS-Var ziehen (damit Styles zentral bleiben)
-      btn.style.background = getComputedStyle(document.documentElement).getPropertyValue(m.cssVar).trim() || "#fff";
+      btn.style.background =
+        getComputedStyle(document.documentElement).getPropertyValue(m.cssVar).trim() || "#fff";
 
       btn.addEventListener("click", () => {
         selectedMarkerId = m.id;
-        // aria-checked aktualisieren
         for (const child of swatchesEl.querySelectorAll(".swatch")) {
           child.setAttribute("aria-checked", "false");
         }
@@ -126,6 +125,22 @@
 
       swatchesEl.appendChild(btn);
     }
+
+    const clearBtn = document.createElement("button");
+    clearBtn.type = "button";
+    clearBtn.className = "clear-all";
+    clearBtn.textContent = "Clear all";
+    clearBtn.addEventListener("click", () => clearAllMarkers());
+    swatchesEl.parentElement.appendChild(clearBtn);
+  };
+
+  const clearAllMarkers = () => {
+    markerMap = {};
+    saveMarkerMap(markerMap);
+
+    // Alle sichtbaren Marker entfernen
+    const marked = calendarEl.querySelectorAll(".day-cell.has-marker");
+    for (const cell of marked) applyMarkerToCell(cell, null);
   };
 
   // --------- Kalender Rendering ----------
@@ -137,7 +152,6 @@
     wrap.className = "year";
     wrap.dataset.year = String(year);
 
-    // Header: Jahr + Wochentage (über 37 Spalten wiederholt)
     const header = document.createElement("div");
     header.className = "year-header";
 
@@ -155,7 +169,6 @@
     }
     wrap.appendChild(header);
 
-    // Monatszeilen
     for (let m = 0; m < 12; m++) {
       const row = document.createElement("div");
       row.className = "month-row";
@@ -174,7 +187,7 @@
         cell.className = "day-cell";
         if (isWeekendColumn(c)) cell.classList.add("weekend-col");
 
-        const dayNum = (c - lead) + 1; // 1..dim
+        const dayNum = (c - lead) + 1;
 
         if (dayNum < 1 || dayNum > dim) {
           cell.classList.add("empty");
@@ -188,7 +201,6 @@
 
           if (key === todayKey) cell.classList.add("today");
 
-          // Marker aus Storage anwenden
           const stored = markerMap[key];
           if (stored) applyMarkerToCell(cell, stored);
         }
@@ -249,11 +261,8 @@
       for (const e of entries) {
         if (!e.isIntersecting) continue;
 
-        if (e.target === sentinelTop) {
-          prependYears(CHUNK_YEARS);
-        } else if (e.target === sentinelBottom) {
-          appendYears(CHUNK_YEARS);
-        }
+        if (e.target === sentinelTop) prependYears(CHUNK_YEARS);
+        else if (e.target === sentinelBottom) appendYears(CHUNK_YEARS);
       }
     }, { root: scroller, threshold: 0.01 });
 
@@ -274,14 +283,12 @@
     const selected = selectedMarkerId;
 
     if (current === selected) {
-      // Toggle zurück (weiß / weekend-grau)
       applyMarkerToCell(cell, null);
       delete markerMap[dateKey];
       saveMarkerMap(markerMap);
       return;
     }
 
-    // Neue Farbe setzen
     applyMarkerToCell(cell, selected);
     markerMap[dateKey] = selected;
     saveMarkerMap(markerMap);
@@ -289,7 +296,8 @@
 
   // --------- Start ----------
   const init = () => {
-    renderSwatches();
+    // Toolbar: Swatches + Clear all Button
+    renderSwatchesAndClear();
 
     minYear = todayYear - INITIAL_YEARS_BEFORE;
     maxYear = todayYear + INITIAL_YEARS_AFTER;
