@@ -4,9 +4,16 @@
   --weekend:#f0f0f0;
   --today:#fff3b0;
 
+  /* Markerfarben */
+  --m-yellow: #fff3b0;
+  --m-green:  #c9f7d5;
+  --m-blue:   #cfe7ff;
+  --m-red:    #ffd0d0;
+  --m-purple: #ead7ff;
+
   /* Layout */
   --label-w: 72px;     /* Monat/Jahr-Spalte */
-  --cols: 42;          /* 6 Wochen * 7 Tage */
+  --cols: 37;          /* lead (0..6) + max 31 Tage => 37 */
   --cell-h: 28px;      /* Zellenhöhe */
 }
 
@@ -20,28 +27,54 @@ html, body{
   font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
 }
 
-/* Vollbild, möglichst viel Fläche für den Kalender */
 .app{
   height:100%;
   width:100%;
+  display:flex;
+  flex-direction:column;
 }
 
-/* Nur vertikal scrollen; keine horizontale Scrollbar */
-.scroller{
-  height:100%;
-  width:100%;
-  overflow-y:auto;
-  overflow-x:hidden;
+/* Sehr klein halten, damit der Kalender den Platz bekommt */
+.toolbar{
+  border-bottom:1px solid var(--line);
+  padding:6px 8px;
   background:var(--bg);
 }
 
-/* Container: keine “Deko”, nur ein wenig Luft zum Rand */
+.swatches{
+  display:flex;
+  gap:8px;
+  align-items:center;
+}
+
+.swatch{
+  width:18px;
+  height:18px;
+  border:1px solid var(--line);
+  background:var(--bg);
+  padding:0;
+  cursor:pointer;
+}
+
+.swatch[aria-checked="true"]{
+  outline:2px solid var(--line);
+  outline-offset:2px;
+}
+
+.scroller{
+  flex:1;
+  width:100%;
+  overflow-y:auto;
+  overflow-x:hidden; /* kein horizontal scrollen */
+  background:var(--bg);
+}
+
 .calendar{
   width:100%;
   padding:8px;
 }
 
-/* Ein Jahrblock */
+/* Jahrblock */
 .year{
   width:100%;
   border-right:1px solid var(--line);
@@ -49,65 +82,76 @@ html, body{
   margin-bottom:10px;
 }
 
-/* Zeilen: Jahr-Header + Monatszeilen */
 .year-header,
 .month-row{
   display:grid;
   grid-template-columns: var(--label-w) repeat(var(--cols), minmax(0, 1fr));
 }
 
-/* Linke Beschriftungszelle (Jahr / Monat) */
+/* Linke Beschriftungszelle */
 .label-cell{
   border-left:1px solid var(--line);
   border-top:1px solid var(--line);
   padding:6px 8px;
   font-weight:600;
   background:var(--bg);
-  font-size: 12px;
-  line-height: 1;
-  white-space: nowrap;
+  font-size:12px;
+  line-height:1;
+  white-space:nowrap;
 }
 
-/* Header-Zellen (Wochentage) */
+/* Header-Zellen */
 .header-cell{
   border-left:1px solid var(--line);
   border-top:1px solid var(--line);
-  height: var(--cell-h);
+  height:var(--cell-h);
   display:flex;
   align-items:center;
   justify-content:center;
-  font-size: 11px;
+  font-size:11px;
   user-select:none;
-  background: var(--bg);
+  background:var(--bg);
 }
 
 /* Tageszellen */
 .day-cell{
   border-left:1px solid var(--line);
   border-top:1px solid var(--line);
-  height: var(--cell-h);
+  height:var(--cell-h);
   padding:4px 6px;
   font-size: clamp(9px, 1.2vw, 12px);
-  line-height: 1;
-  background: var(--bg);
+  line-height:1;
+  background:var(--bg);
 }
 
-/* Sa/So-Spalten (auch in leeren Zellen) */
+/* Sa/So-Spalten */
 .weekend-col{
   background: var(--weekend);
 }
 
-/* Leere Zellen: behalten Grid und Weekend-Färbung, aber ohne sichtbare Zahl */
 .day-cell.empty{
-  color: transparent;
+  color: transparent; /* bleibt leer */
 }
 
-/* Heutiger Tag */
+/* Heute: Rahmen immer sichtbar; Hintergrund nur wenn kein Marker */
 .day-cell.today{
+  box-shadow: inset 0 0 0 2px var(--line);
+}
+
+.day-cell.today:not(.has-marker){
   background: var(--today);
 }
 
-/* Sentinel für Infinite Scroll */
-.sentinel{
-  height: 1px;
+/* Marker: überschreiben Grundhintergründe (auch weekend) */
+.day-cell.has-marker{
+  /* Hintergrund kommt über die marker-... Klassen */
 }
+
+.day-cell.marker-yellow{ background: var(--m-yellow); }
+.day-cell.marker-green{  background: var(--m-green);  }
+.day-cell.marker-blue{   background: var(--m-blue);   }
+.day-cell.marker-red{    background: var(--m-red);    }
+.day-cell.marker-purple{ background: var(--m-purple); }
+
+/* Sentinel */
+.sentinel{ height:1px; }

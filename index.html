@@ -8,11 +8,15 @@
 </head>
 <body>
   <main class="app">
+    <header class="toolbar" aria-label="Marker-Auswahl">
+      <div class="swatches" id="swatches" role="radiogroup" aria-label="Markerfarben">
+        <!-- Buttons werden in app.js erzeugt -->
+      </div>
+    </header>
+
     <div id="scroller" class="scroller" aria-label="Kalender-Scroller">
       <div id="sentinel-top" class="sentinel" aria-hidden="true"></div>
-
       <section id="calendar" class="calendar" aria-label="Kalender (Monate als Zeilen)"></section>
-
       <div id="sentinel-bottom" class="sentinel" aria-hidden="true"></div>
     </div>
   </main>
