@@ -7,7 +7,7 @@
    * - Shift+Klick (Farbmodus): Range einfärben
    * - Radierer-Tool: Klick löscht Farbe; Shift+Klick löscht Range (inkl. Endpunkte)
    * - Stift-Tool: Notiz hinzufügen/bearbeiten; leer speichern => löschen
-   * - Notiz: Tooltip + Punkt unten rechts
+   * - Notiz: Tooltip (mit Newlines) + Punkt unten rechts
    * - Clear all löscht nur Farben (Notizen bleiben)
    */
 
@@ -127,7 +127,8 @@
     cell.dataset.marker = markerIdOrNull;
   };
 
-  const formatTooltip = (text) => String(text).replace(/\s*\n+\s*/g, " / ").trim();
+  // Tooltip: Newlines beibehalten (normalize Windows \r\n => \n)
+  const tooltipText = (text) => String(text).replace(/\r\n/g, "\n");
 
   const applyNoteToCell = (cell, noteTextOrNull) => {
     cell.classList.remove("has-note");
@@ -140,7 +141,9 @@
 
     cell.classList.add("has-note");
     cell.dataset.note = noteTextOrNull;
-    cell.setAttribute("title", formatTooltip(noteTextOrNull));
+
+    // Native title-Tooltip soll Zeilenumbrüche wie im Textfeld anzeigen
+    cell.setAttribute("title", tooltipText(noteTextOrNull));
   };
 
   // ---------- Mode ----------
@@ -430,7 +433,6 @@
         return;
       }
 
-      // Single erase
       if (markerMap[dateKey] !== undefined) delete markerMap[dateKey];
       applyMarkerToCell(cell, null);
       safeSave(STORAGE_MARKERS, markerMap);
