@@ -161,12 +161,17 @@ html, body{
   border-left:1px solid var(--line);
   border-top:1px solid var(--line);
   height:var(--cell-h);
-  padding:4px 6px;
-  font-size: clamp(9px, 1.2vw, 12px);
+  padding:2px 2px;
+
+  /* Datumszahl kleiner + grau */
+  font-size:8px;
   line-height:1;
+  color:#727272;
+
   background:var(--bg);
   position: relative; /* für Notiz-Preview */
 }
+
 
 /* Sa/So-Spalten */
 .weekend-col{
@@ -192,10 +197,11 @@ html, body{
 /* Notiz-Indikator: erstes Wort unten rechts (klein, nicht fett, ohne Ellipsis) */
 .note-preview{
   position:absolute;
-  right:4px;
+  left: 2px;
   bottom:2px;
   font-weight:400;     /* nicht fett */
   font-size:9px;       /* kleiner */
+  color:#000000;
   line-height:1;
   max-width: calc(100% - 6px);
   overflow:hidden;
