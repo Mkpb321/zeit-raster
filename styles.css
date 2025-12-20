@@ -204,6 +204,15 @@ html, body{
   pointer-events:none;
 }
 
+/* WICHTIG: im Kalender keine Text-Selektion */
+.day-cell,
+.label-cell,
+.header-cell,
+.note-preview{
+  user-select:none;
+  -webkit-user-select:none;
+}
+
 /* Modal (Notiz/Clear) – minimal */
 .modal{
   position: fixed;

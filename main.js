@@ -35,7 +35,6 @@
     // State
     mode: "color",                 // "color" | "pen" | "erase"
     selectedMarkerId: CONFIG.MARKERS[0].id,
-    rangeAnchorKey: null,
 
     editingDateKey: null,
     editingCell: null,
@@ -51,6 +50,15 @@
     todayYear: null,
 
     monthFmt: new Intl.DateTimeFormat(undefined, { month: "short" }),
+
+    // Drag state
+    dragActive: false,
+    dragStarted: false,   // ob schon echte Drag-Bewegung auf ein anderes Feld passiert ist
+    dragPointerId: null,
+    dragMode: null,       // "color" | "erase"
+    dragMarkerId: null,
+    dragStartKey: null,
+    dragLastKey: null,
   };
 
   // CSS cols setzen
@@ -62,73 +70,176 @@
   state.todayKey = U.ymd(today);
   state.todayYear = today.getFullYear();
 
-  // ------- Range actions -------
-  const applyColorRange = (fromKey, toKey, markerId) => {
-    U.iterateRangeKeys(fromKey, toKey, (key) => {
-      state.markerMap[key] = markerId;
-      const cell = state.calendarEl.querySelector(`.day-cell[data-date="${key}"]`);
-      if (cell) A.applyMarkerToCell(cell, markerId);
-    });
+  // ------- Helpers -------
+  const getDayCellFromEventTarget = (t) => {
+    const cell = t && t.closest ? t.closest(".day-cell") : null;
+    if (!cell) return null;
+    if (cell.classList.contains("empty")) return null;
+    if (!cell.dataset.date) return null;
+    return cell;
+  };
+
+  const getDayCellFromPoint = (x, y) => {
+    const el = document.elementFromPoint(x, y);
+    return getDayCellFromEventTarget(el);
+  };
+
+  const applyColorOnKey = (key, markerId) => {
+    state.markerMap[key] = markerId;
+    const cell = state.calendarEl.querySelector(`.day-cell[data-date="${key}"]`);
+    if (cell) A.applyMarkerToCell(cell, markerId);
+  };
+
+  const eraseColorOnKey = (key) => {
+    if (state.markerMap[key] !== undefined) delete state.markerMap[key];
+    const cell = state.calendarEl.querySelector(`.day-cell[data-date="${key}"]`);
+    if (cell) A.applyMarkerToCell(cell, null);
+  };
+
+  // Während Drag: Lücken füllen (Range zwischen lastKey und newKey)
+  const applyDragRangeStep = (fromKey, toKey) => {
+    if (!fromKey || !toKey) return;
+
+    if (state.dragMode === "color") {
+      U.iterateRangeKeys(fromKey, toKey, (k) => applyColorOnKey(k, state.dragMarkerId));
+      return;
+    }
+
+    if (state.dragMode === "erase") {
+      U.iterateRangeKeys(fromKey, toKey, (k) => eraseColorOnKey(k));
+    }
+  };
+
+  const saveMarkers = () => {
     S.safeSave(CONFIG.STORAGE_MARKERS, state.markerMap);
   };
 
-  const eraseColorRange = (fromKey, toKey) => {
-    U.iterateRangeKeys(fromKey, toKey, (key) => {
-      if (state.markerMap[key] !== undefined) delete state.markerMap[key];
-      const cell = state.calendarEl.querySelector(`.day-cell[data-date="${key}"]`);
-      if (cell) A.applyMarkerToCell(cell, null);
-    });
-    S.safeSave(CONFIG.STORAGE_MARKERS, state.markerMap);
-  };
-
-  // ------- Calendar click handler -------
-  const onCalendarClick = (ev) => {
-    const cell = ev.target.closest(".day-cell");
-    if (!cell) return;
-    if (cell.classList.contains("empty")) return;
-
-    const dateKey = cell.dataset.date;
-    if (!dateKey) return;
-
+  // Single click behavior (ohne Drag):
+  // - color: toggle wie bisher (same color => entfernen)
+  // - erase: entfernen
+  // - pen: modal
+  const handleSingleClick = (dateKey, cell) => {
     if (state.mode === "pen") {
       UI.openNoteModal(state, dateKey, cell);
       return;
     }
 
     if (state.mode === "erase") {
-      if (ev.shiftKey && state.rangeAnchorKey) {
-        eraseColorRange(state.rangeAnchorKey, dateKey);
-        state.rangeAnchorKey = dateKey;
-        return;
-      }
-
-      if (state.markerMap[dateKey] !== undefined) delete state.markerMap[dateKey];
-      A.applyMarkerToCell(cell, null);
-      S.safeSave(CONFIG.STORAGE_MARKERS, state.markerMap);
-      state.rangeAnchorKey = dateKey;
+      eraseColorOnKey(dateKey);
+      saveMarkers();
       return;
     }
 
-    // color mode
+    // color
     const selected = state.selectedMarkerId;
+    const current = cell.dataset.marker || null;
 
-    if (ev.shiftKey && state.rangeAnchorKey) {
-      applyColorRange(state.rangeAnchorKey, dateKey, selected);
-      state.rangeAnchorKey = dateKey;
+    if (current === selected) {
+      eraseColorOnKey(dateKey);
+    } else {
+      applyColorOnKey(dateKey, selected);
+    }
+    saveMarkers();
+  };
+
+  // ------- Pointer Drag Painting / Erasing -------
+  const onPointerDown = (ev) => {
+    // nur primäre Taste / primary pointer
+    if (ev.button !== 0) return;
+
+    const cell = getDayCellFromEventTarget(ev.target);
+    if (!cell) return;
+
+    const dateKey = cell.dataset.date;
+
+    // Pen: kein Drag – normaler Klick (wir handeln in pointerup)
+    if (state.mode === "pen") {
+      // Text-Selektion verhindern
+      ev.preventDefault();
+      state.dragActive = true;
+      state.dragStarted = false;
+      state.dragPointerId = ev.pointerId;
+      state.dragMode = "pen";
+      state.dragStartKey = dateKey;
+      state.dragLastKey = dateKey;
+
+      try { state.calendarEl.setPointerCapture(ev.pointerId); } catch {}
       return;
     }
 
-    const current = cell.dataset.marker || null;
-    if (current === selected) {
-      A.applyMarkerToCell(cell, null);
-      delete state.markerMap[dateKey];
-      S.safeSave(CONFIG.STORAGE_MARKERS, state.markerMap);
+    // color/erase: Drag möglich
+    ev.preventDefault(); // verhindert Textselektion beim Ziehen
+
+    state.dragActive = true;
+    state.dragStarted = false;
+    state.dragPointerId = ev.pointerId;
+    state.dragMode = (state.mode === "erase") ? "erase" : "color";
+    state.dragMarkerId = state.selectedMarkerId;
+    state.dragStartKey = dateKey;
+    state.dragLastKey = dateKey;
+
+    try { state.calendarEl.setPointerCapture(ev.pointerId); } catch {}
+  };
+
+  const onPointerMove = (ev) => {
+    if (!state.dragActive) return;
+    if (state.dragPointerId !== ev.pointerId) return;
+
+    // Pen: keine Drag-Aktion
+    if (state.dragMode === "pen") return;
+
+    // Nur wenn Taste gedrückt ist
+    if ((ev.buttons & 1) !== 1) return;
+
+    const cell = getDayCellFromPoint(ev.clientX, ev.clientY);
+    if (!cell) return;
+
+    const key = cell.dataset.date;
+    if (!key) return;
+    if (key === state.dragLastKey) return;
+
+    // Ab erster Bewegung gilt als "drag started"
+    state.dragStarted = true;
+
+    // Range zwischen letztem Key und aktuellem Key anwenden (füllt Lücken)
+    applyDragRangeStep(state.dragLastKey, key);
+
+    // lastKey aktualisieren und sofort speichern (damit nichts verloren geht)
+    state.dragLastKey = key;
+    saveMarkers();
+  };
+
+  const onPointerUpOrCancel = (ev) => {
+    if (!state.dragActive) return;
+    if (state.dragPointerId !== ev.pointerId) return;
+
+    const endCell = getDayCellFromPoint(ev.clientX, ev.clientY);
+    const endKey = endCell ? endCell.dataset.date : state.dragLastKey;
+
+    // Wenn kein echtes Drag stattgefunden hat => Single Click ausführen
+    if (!state.dragStarted) {
+      const startCell = state.calendarEl.querySelector(`.day-cell[data-date="${state.dragStartKey}"]`);
+      if (startCell && state.dragStartKey) {
+        handleSingleClick(state.dragStartKey, startCell);
+      }
     } else {
-      A.applyMarkerToCell(cell, selected);
-      state.markerMap[dateKey] = selected;
-      S.safeSave(CONFIG.STORAGE_MARKERS, state.markerMap);
+      // Bei Drag: sicherstellen, dass auch der letzte Schritt angewendet ist (falls Up auf neuem Feld)
+      if (state.dragMode !== "pen" && endKey && endKey !== state.dragLastKey) {
+        applyDragRangeStep(state.dragLastKey, endKey);
+        saveMarkers();
+      }
     }
-    state.rangeAnchorKey = dateKey;
+
+    // Cleanup
+    state.dragActive = false;
+    state.dragStarted = false;
+    state.dragPointerId = null;
+    state.dragMode = null;
+    state.dragMarkerId = null;
+    state.dragStartKey = null;
+    state.dragLastKey = null;
+
+    try { state.calendarEl.releasePointerCapture(ev.pointerId); } catch {}
   };
 
   // ------- Render / Infinite Scroll -------
@@ -214,8 +325,11 @@
       await UI.importDataFromFile(state, file);
     });
 
-    // Calendar click
-    state.calendarEl.addEventListener("click", onCalendarClick);
+    // Pointer-based drag interaction
+    state.calendarEl.addEventListener("pointerdown", onPointerDown);
+    state.calendarEl.addEventListener("pointermove", onPointerMove);
+    state.calendarEl.addEventListener("pointerup", onPointerUpOrCancel);
+    state.calendarEl.addEventListener("pointercancel", onPointerUpOrCancel);
 
     // Default mode
     UI.setMode(state, "color");
