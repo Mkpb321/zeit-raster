@@ -21,6 +21,11 @@
     importFile: document.getElementById("importFile"),
     clearBtn: document.getElementById("clearBtn"),
 
+    // Info
+    infoBtn: document.getElementById("infoBtn"),
+    infoModal: document.getElementById("infoModal"),
+    infoCloseBtn: document.getElementById("infoClose"),
+
     noteModal: document.getElementById("noteModal"),
     noteDateEl: document.getElementById("noteDate"),
     noteTextEl: document.getElementById("noteText"),
@@ -55,7 +60,7 @@
     dragActive: false,
     dragStarted: false,   // ob schon echte Drag-Bewegung auf ein anderes Feld passiert ist
     dragPointerId: null,
-    dragMode: null,       // "color" | "erase"
+    dragMode: null,       // "color" | "erase" | "pen"
     dragMarkerId: null,
     dragStartKey: null,
     dragLastKey: null,
@@ -144,7 +149,6 @@
 
   // ------- Pointer Drag Painting / Erasing -------
   const onPointerDown = (ev) => {
-    // nur primäre Taste / primary pointer
     if (ev.button !== 0) return;
 
     const cell = getDayCellFromEventTarget(ev.target);
@@ -154,7 +158,6 @@
 
     // Pen: kein Drag – normaler Klick (wir handeln in pointerup)
     if (state.mode === "pen") {
-      // Text-Selektion verhindern
       ev.preventDefault();
       state.dragActive = true;
       state.dragStarted = false;
@@ -168,7 +171,7 @@
     }
 
     // color/erase: Drag möglich
-    ev.preventDefault(); // verhindert Textselektion beim Ziehen
+    ev.preventDefault();
 
     state.dragActive = true;
     state.dragStarted = false;
@@ -185,10 +188,7 @@
     if (!state.dragActive) return;
     if (state.dragPointerId !== ev.pointerId) return;
 
-    // Pen: keine Drag-Aktion
     if (state.dragMode === "pen") return;
-
-    // Nur wenn Taste gedrückt ist
     if ((ev.buttons & 1) !== 1) return;
 
     const cell = getDayCellFromPoint(ev.clientX, ev.clientY);
@@ -198,13 +198,10 @@
     if (!key) return;
     if (key === state.dragLastKey) return;
 
-    // Ab erster Bewegung gilt als "drag started"
     state.dragStarted = true;
 
-    // Range zwischen letztem Key und aktuellem Key anwenden (füllt Lücken)
     applyDragRangeStep(state.dragLastKey, key);
 
-    // lastKey aktualisieren und sofort speichern (damit nichts verloren geht)
     state.dragLastKey = key;
     saveMarkers();
   };
@@ -223,14 +220,13 @@
         handleSingleClick(state.dragStartKey, startCell);
       }
     } else {
-      // Bei Drag: sicherstellen, dass auch der letzte Schritt angewendet ist (falls Up auf neuem Feld)
+      // Bei Drag: letzter Schritt (falls Up auf neuem Feld)
       if (state.dragMode !== "pen" && endKey && endKey !== state.dragLastKey) {
         applyDragRangeStep(state.dragLastKey, endKey);
         saveMarkers();
       }
     }
 
-    // Cleanup
     state.dragActive = false;
     state.dragStarted = false;
     state.dragPointerId = null;
@@ -240,6 +236,18 @@
     state.dragLastKey = null;
 
     try { state.calendarEl.releasePointerCapture(ev.pointerId); } catch {}
+  };
+
+  // ------- Info Modal -------
+  const openInfoModal = () => {
+    state.infoModal.hidden = false;
+    state.infoModal.setAttribute("aria-hidden", "false");
+    setTimeout(() => state.infoCloseBtn.focus(), 0);
+  };
+
+  const closeInfoModal = () => {
+    state.infoModal.hidden = true;
+    state.infoModal.setAttribute("aria-hidden", "true");
   };
 
   // ------- Render / Infinite Scroll -------
@@ -324,6 +332,10 @@
       if (!file) return;
       await UI.importDataFromFile(state, file);
     });
+
+    // Info
+    state.infoBtn.addEventListener("click", openInfoModal);
+    state.infoCloseBtn.addEventListener("click", closeInfoModal);
 
     // Pointer-based drag interaction
     state.calendarEl.addEventListener("pointerdown", onPointerDown);

@@ -24,7 +24,7 @@
         type="button"
         class="tool-btn"
         aria-pressed="false"
-        title="Radierer (Farben entfernen; Shift+Klick = Range löschen)"
+        title="Radierer (Farben entfernen; Drag = Bereich löschen)"
       >⌫</button>
 
       <button id="exportBtn" type="button" class="tool-btn wide" title="Export (Backup-Datei)">
@@ -35,6 +35,14 @@
         Import
       </button>
       <input id="importFile" type="file" accept="application/json,.json" hidden />
+
+      <button
+        id="infoBtn"
+        type="button"
+        class="tool-btn"
+        title="Info / Hilfe"
+        aria-label="Info"
+      >?</button>
 
       <button id="clearBtn" type="button" class="clear-all" title="Löschen-Menü">
         Clear
@@ -95,6 +103,76 @@
       <div class="modal-actions">
         <button id="clearCancel" type="button" class="modal-btn">Abbrechen</button>
         <button id="clearDo" type="button" class="modal-btn primary">Löschen</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Info / Hilfe -->
+  <div id="infoModal" class="modal" hidden aria-hidden="true">
+    <div class="modal-card info-card" role="dialog" aria-modal="true" aria-labelledby="infoTitle">
+      <div class="modal-head">
+        <div id="infoTitle" class="modal-title">Info</div>
+        <div class="modal-date"></div>
+      </div>
+
+      <div class="modal-body info-body">
+        <div class="info-section">
+          <div class="info-h">Grundidee</div>
+          <ul class="info-list">
+            <li>Monate sind Zeilen, Spalten sind Wochentage (Mo–So).</li>
+            <li>Wochenende (Sa/So) ist leicht grau, <span class="info-strong">heute</span> ist nur umrandet.</li>
+            <li>Notizen zeigen unten rechts das <span class="info-strong">erste Wort</span>; Hover zeigt die ganze Notiz (mit Zeilenumbrüchen).</li>
+          </ul>
+        </div>
+
+        <div class="info-section">
+          <div class="info-h">Farben (Marker)</div>
+          <ul class="info-list">
+            <li>Farbe wählen (Farbkästchen) → Kalender ist im <span class="info-strong">Farbmodus</span>.</li>
+            <li><span class="info-strong">Klick</span> auf Tag: Farbe setzen; klickst du die <span class="info-strong">gleiche</span> Farbe erneut → wird entfernt.</li>
+            <li><span class="info-strong">Drag</span> (Maustaste halten & ziehen): alle überfahrenen Tage werden sofort in der gewählten Farbe gesetzt.</li>
+          </ul>
+        </div>
+
+        <div class="info-section">
+          <div class="info-h">Radierer</div>
+          <ul class="info-list">
+            <li>Radierer aktivieren (<span class="info-kbd">⌫</span>).</li>
+            <li><span class="info-strong">Klick</span>: entfernt Farbe eines Tages.</li>
+            <li><span class="info-strong">Drag</span>: entfernt Farben für alle überfahrenen Tage.</li>
+            <li><span class="info-strong">Notizen bleiben immer erhalten</span> (Radierer betrifft nur Farben).</li>
+          </ul>
+        </div>
+
+        <div class="info-section">
+          <div class="info-h">Stift (Notizen)</div>
+          <ul class="info-list">
+            <li>Stift aktivieren (<span class="info-kbd">✎</span>) und auf einen Tag klicken.</li>
+            <li><span class="info-strong">Speichern</span> schreibt die Notiz; wenn du alles löschst und speicherst → Notiz wird entfernt.</li>
+            <li>Das Notizfenster schließt nur über <span class="info-strong">Abbrechen</span> oder <span class="info-strong">Speichern</span>.</li>
+          </ul>
+        </div>
+
+        <div class="info-section">
+          <div class="info-h">Clear / Löschen</div>
+          <ul class="info-list">
+            <li><span class="info-strong">Clear</span> öffnet ein Menü: Farben löschen, Notizen löschen oder alles löschen.</li>
+            <li>Löschen erfordert eine <span class="info-strong">zweite Bestätigung</span>.</li>
+          </ul>
+        </div>
+
+        <div class="info-section">
+          <div class="info-h">Backup</div>
+          <ul class="info-list">
+            <li><span class="info-strong">Export</span>: lädt eine JSON-Datei mit Farben + Notizen herunter.</li>
+            <li><span class="info-strong">Import</span>: ersetzt den aktuellen Stand (Farben/Notizen) durch den Inhalt der Datei.</li>
+            <li>Alles wird weiterhin im Browser gespeichert (localStorage).</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="modal-actions">
+        <button id="infoClose" type="button" class="modal-btn primary">Schließen</button>
       </div>
     </div>
   </div>

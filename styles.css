@@ -204,7 +204,7 @@ html, body{
   pointer-events:none;
 }
 
-/* WICHTIG: im Kalender keine Text-Selektion */
+/* im Kalender keine Text-Selektion */
 .day-cell,
 .label-cell,
 .header-cell,
@@ -213,7 +213,7 @@ html, body{
   -webkit-user-select:none;
 }
 
-/* Modal (Notiz/Clear) – minimal */
+/* Modal (Notiz/Clear/Info) – minimal */
 .modal{
   position: fixed;
   inset: 0;
@@ -299,6 +299,45 @@ html, body{
 
 .modal-btn.primary{
   font-weight: 700;
+}
+
+/* Info modal: etwas breiter + kompakte Typografie */
+.info-card{
+  width: min(560px, 100%);
+}
+
+.info-body{
+  font-size: 12px;
+}
+
+.info-section{
+  margin: 8px 0;
+}
+
+.info-h{
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.info-list{
+  margin: 0;
+  padding-left: 16px;
+}
+
+.info-list li{
+  margin: 2px 0;
+}
+
+.info-strong{
+  font-weight: 700;
+}
+
+.info-kbd{
+  display:inline-block;
+  border:1px solid var(--line);
+  padding: 0 4px;
+  line-height: 1.3;
+  font-size: 11px;
 }
 
 /* Sentinel */
