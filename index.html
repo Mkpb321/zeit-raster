@@ -99,6 +99,13 @@
     </div>
   </div>
 
-  <script src="app.js"></script>
+  <!-- Script-Reihenfolge ist wichtig (keine Module, läuft auch file:// stabil) -->
+  <script src="config.js"></script>
+  <script src="utils.js"></script>
+  <script src="storage.js"></script>
+  <script src="apply.js"></script>
+  <script src="calendar.js"></script>
+  <script src="ui.js"></script>
+  <script src="main.js"></script>
 </body>
 </html>
