@@ -41,6 +41,7 @@ html, body{
   display:flex;
   align-items:center;
   gap:10px;
+  flex-wrap: wrap;
 }
 
 .swatches{
@@ -74,7 +75,13 @@ html, body{
   justify-content:center;
   font-size:14px;
   line-height:1;
-  padding:0;
+  padding:0 6px;
+}
+
+.tool-btn.wide{
+  width:auto;
+  font-size:12px;
+  padding:0 10px;
 }
 
 .tool-btn[aria-pressed="true"]{
@@ -89,6 +96,7 @@ html, body{
   padding:4px 8px;
   font-size:12px;
   cursor:pointer;
+  height:22px;
 }
 
 .clear-all:active{
@@ -157,7 +165,7 @@ html, body{
   font-size: clamp(9px, 1.2vw, 12px);
   line-height:1;
   background:var(--bg);
-  position: relative; /* für Notiz-Punkt */
+  position: relative; /* für Notiz-Preview */
 }
 
 /* Sa/So-Spalten */
@@ -181,19 +189,22 @@ html, body{
 .day-cell.marker-red{    background: var(--m-red);    }
 .day-cell.marker-purple{ background: var(--m-purple); }
 
-/* Notiz-Indikator: fetter Punkt unten rechts */
-.day-cell.has-note::after{
-  content: "•";
+/* Notiz-Indikator: erstes Wort unten rechts */
+.note-preview{
   position:absolute;
   right:4px;
-  bottom:1px;
-  font-weight:900;
-  font-size:14px;
+  bottom:2px;
+  font-weight:700;
+  font-size:10px;
   line-height:1;
-  color:#000;
+  max-width: calc(100% - 6px);
+  overflow:hidden;
+  white-space:nowrap;
+  text-overflow:ellipsis;
+  pointer-events:none;
 }
 
-/* Modal (Notiz) – minimal */
+/* Modal (Notiz/Clear) – minimal */
 .modal{
   position: fixed;
   inset: 0;
@@ -204,7 +215,7 @@ html, body{
   padding: 12px;
 }
 
-/* WICHTIG: hidden muss wirklich ausblenden */
+/* hidden muss wirklich ausblenden */
 .modal[hidden]{
   display:none !important;
 }
@@ -242,6 +253,24 @@ html, body{
   resize: vertical;
   background: var(--bg);
   color: #000;
+}
+
+.modal-body{
+  font-size:12px;
+}
+
+.radio-row{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  margin:6px 0;
+}
+
+.confirm-text{
+  margin-top:10px;
+  padding-top:8px;
+  border-top:1px solid var(--line);
+  font-weight:600;
 }
 
 .modal-actions{

@@ -7,8 +7,10 @@
    * - Shift+Klick (Farbmodus): Range einfärben
    * - Radierer-Tool: Klick löscht Farbe; Shift+Klick löscht Range (inkl. Endpunkte)
    * - Stift-Tool: Notiz hinzufügen/bearbeiten; leer speichern => löschen
-   * - Notiz: Tooltip (mit Newlines) + Punkt unten rechts
-   * - Clear all löscht nur Farben (Notizen bleiben)
+   * - Notiz: Tooltip (mit Newlines) + Preview (erstes Wort) unten rechts
+   * - Export/Import: JSON Backup (Farben + Notizen)
+   * - Clear: Menü + zweite Bestätigung (Farben / Notizen / Alles)
+   * - Notiz-Modal schließt nur über Buttons (kein Outside-Click, kein Esc)
    */
 
   const COLS = 37;
@@ -26,8 +28,8 @@
     { id: "purple",  label: "Lila",   className: "marker-purple",  cssVar: "--m-purple"  },
   ];
 
-  const STORAGE_MARKERS = "calendarMarkersV2";
-  const STORAGE_NOTES = "calendarNotesV1";
+  const STORAGE_MARKERS = "calendarMarkersV3";
+  const STORAGE_NOTES = "calendarNotesV2";
 
   // Tools / Mode
   let mode = "color"; // "color" | "pen" | "erase"
@@ -61,21 +63,33 @@
     return makeLocalNoon(d.getFullYear(), d.getMonth(), d.getDate());
   };
 
+  // DOM
   const scroller = document.getElementById("scroller");
   const calendarEl = document.getElementById("calendar");
   const sentinelTop = document.getElementById("sentinel-top");
   const sentinelBottom = document.getElementById("sentinel-bottom");
   const swatchesEl = document.getElementById("swatches");
-  const clearAllBtn = document.getElementById("clearAll");
+
+  const clearBtn = document.getElementById("clearBtn");
   const penToolBtn = document.getElementById("penTool");
   const eraserToolBtn = document.getElementById("eraserTool");
 
-  // Modal elements
+  const exportBtn = document.getElementById("exportBtn");
+  const importBtn = document.getElementById("importBtn");
+  const importFile = document.getElementById("importFile");
+
+  // Note modal
   const noteModal = document.getElementById("noteModal");
   const noteDateEl = document.getElementById("noteDate");
   const noteTextEl = document.getElementById("noteText");
   const noteSaveBtn = document.getElementById("noteSave");
   const noteCancelBtn = document.getElementById("noteCancel");
+
+  // Clear modal
+  const clearModal = document.getElementById("clearModal");
+  const clearCancelBtn = document.getElementById("clearCancel");
+  const clearDoBtn = document.getElementById("clearDo");
+  const clearConfirmText = document.getElementById("clearConfirmText");
 
   // Heute (lokal)
   const now = new Date();
@@ -112,6 +126,7 @@
   let noteMap = safeLoad(STORAGE_NOTES);     // { "YYYY-MM-DD": "text..." }
 
   const markerById = (id) => MARKERS.find(m => m.id === id) || null;
+  const isValidMarkerId = (id) => MARKERS.some(m => m.id === id);
 
   // ---------- Apply helpers ----------
   const applyMarkerToCell = (cell, markerIdOrNull) => {
@@ -130,20 +145,62 @@
   // Tooltip: Newlines beibehalten (normalize Windows \r\n => \n)
   const tooltipText = (text) => String(text).replace(/\r\n/g, "\n");
 
+  // Notiz-Preview: erstes Wort bis Space oder Newline
+  const notePreview = (text) => {
+    const t = String(text).replace(/\r\n/g, "\n").trim();
+    if (!t) return "";
+    const nl = t.indexOf("\n");
+    const firstLine = (nl >= 0) ? t.slice(0, nl) : t;
+    const m = firstLine.trim().match(/^\S+/);
+    return m ? m[0] : "";
+  };
+
+  const setNotePreviewElement = (cell, previewOrNull) => {
+    let el = cell.querySelector(".note-preview");
+    if (!previewOrNull) {
+      if (el) el.remove();
+      return;
+    }
+    if (!el) {
+      el = document.createElement("span");
+      el.className = "note-preview";
+      cell.appendChild(el);
+    }
+    el.textContent = previewOrNull;
+  };
+
   const applyNoteToCell = (cell, noteTextOrNull) => {
     cell.classList.remove("has-note");
     delete cell.dataset.note;
 
     if (!noteTextOrNull) {
       cell.removeAttribute("title");
+      setNotePreviewElement(cell, null);
       return;
     }
 
     cell.classList.add("has-note");
     cell.dataset.note = noteTextOrNull;
 
-    // Native title-Tooltip soll Zeilenumbrüche wie im Textfeld anzeigen
     cell.setAttribute("title", tooltipText(noteTextOrNull));
+    setNotePreviewElement(cell, notePreview(noteTextOrNull));
+  };
+
+  const applyAllFromMapsToRenderedCells = () => {
+    const cells = calendarEl.querySelectorAll(".day-cell[data-date]");
+    for (const cell of cells) {
+      const key = cell.dataset.date;
+
+      // Marker
+      const m = markerMap[key];
+      if (m && isValidMarkerId(m)) applyMarkerToCell(cell, m);
+      else applyMarkerToCell(cell, null);
+
+      // Note
+      const n = noteMap[key];
+      if (typeof n === "string" && n.trim().length > 0) applyNoteToCell(cell, n);
+      else applyNoteToCell(cell, null);
+    }
   };
 
   // ---------- Mode ----------
@@ -174,8 +231,6 @@
           child.setAttribute("aria-checked", "false");
         }
         btn.setAttribute("aria-checked", "true");
-
-        // Farbauswahl => Farbmodus
         setMode("color");
       });
 
@@ -183,18 +238,151 @@
     }
   };
 
-  // ---------- Clear all (nur Farben) ----------
-  const clearAllColors = () => {
-    markerMap = {};
-    safeSave(STORAGE_MARKERS, markerMap);
+  // ---------- Export / Import ----------
+  const exportData = () => {
+    const payload = {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      markers: markerMap,
+      notes: noteMap
+    };
 
-    const anyMarked = calendarEl.querySelectorAll(".day-cell[data-marker]");
-    for (const cell of anyMarked) {
-      applyMarkerToCell(cell, null);
-    }
+    const json = JSON.stringify(payload, null, 2);
+    const blob = new Blob([json], { type: "application/json" });
+
+    const ts = new Date();
+    const name =
+      `calendar-backup-${ts.getFullYear()}${pad2(ts.getMonth() + 1)}${pad2(ts.getDate())}-` +
+      `${pad2(ts.getHours())}${pad2(ts.getMinutes())}${pad2(ts.getSeconds())}.json`;
+
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(a.href);
   };
 
-  // ---------- Modal (Notes) ----------
+  const importDataFromFile = async (file) => {
+    const text = await file.text();
+    let obj;
+    try {
+      obj = JSON.parse(text);
+    } catch {
+      alert("Import fehlgeschlagen: Datei ist kein gültiges JSON.");
+      return;
+    }
+
+    const markers = obj && obj.markers;
+    const notes = obj && obj.notes;
+
+    if (!markers || typeof markers !== "object" || !notes || typeof notes !== "object") {
+      alert("Import fehlgeschlagen: Datei-Format ungültig (markers/notes fehlen).");
+      return;
+    }
+
+    // Sanitizen/Validieren
+    const nextMarkers = {};
+    for (const [k, v] of Object.entries(markers)) {
+      if (typeof k !== "string") continue;
+      if (typeof v !== "string") continue;
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(k)) continue;
+      if (!isValidMarkerId(v)) continue;
+      nextMarkers[k] = v;
+    }
+
+    const nextNotes = {};
+    for (const [k, v] of Object.entries(notes)) {
+      if (typeof k !== "string") continue;
+      if (typeof v !== "string") continue;
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(k)) continue;
+      if (v.trim().length === 0) continue;
+      nextNotes[k] = v;
+    }
+
+    // Alles ersetzen
+    markerMap = nextMarkers;
+    noteMap = nextNotes;
+
+    safeSave(STORAGE_MARKERS, markerMap);
+    safeSave(STORAGE_NOTES, noteMap);
+
+    // UI aktualisieren
+    applyAllFromMapsToRenderedCells();
+  };
+
+  // ---------- Clear Menü ----------
+  let clearStepConfirm = false;
+
+  const openClearModal = () => {
+    clearStepConfirm = false;
+    clearConfirmText.hidden = true;
+    clearDoBtn.textContent = "Löschen";
+
+    clearModal.hidden = false;
+    clearModal.setAttribute("aria-hidden", "false");
+  };
+
+  const closeClearModal = () => {
+    clearModal.hidden = true;
+    clearModal.setAttribute("aria-hidden", "true");
+  };
+
+  const getClearChoice = () => {
+    const el = clearModal.querySelector('input[name="clearChoice"]:checked');
+    return el ? el.value : "colors";
+  };
+
+  const doClearAction = (choice) => {
+    if (choice === "colors") {
+      markerMap = {};
+      safeSave(STORAGE_MARKERS, markerMap);
+      const anyMarked = calendarEl.querySelectorAll(".day-cell[data-marker]");
+      for (const cell of anyMarked) applyMarkerToCell(cell, null);
+      return;
+    }
+
+    if (choice === "notes") {
+      noteMap = {};
+      safeSave(STORAGE_NOTES, noteMap);
+      const anyNotes = calendarEl.querySelectorAll(".day-cell.has-note");
+      for (const cell of anyNotes) applyNoteToCell(cell, null);
+      return;
+    }
+
+    // all
+    markerMap = {};
+    noteMap = {};
+    safeSave(STORAGE_MARKERS, markerMap);
+    safeSave(STORAGE_NOTES, noteMap);
+    applyAllFromMapsToRenderedCells();
+  };
+
+  // Wenn Auswahl geändert wird, Bestätigung zurücksetzen
+  clearModal.addEventListener("change", (e) => {
+    if (e.target && e.target.name === "clearChoice") {
+      clearStepConfirm = false;
+      clearConfirmText.hidden = true;
+      clearDoBtn.textContent = "Löschen";
+    }
+  });
+
+  clearCancelBtn.addEventListener("click", closeClearModal);
+  clearDoBtn.addEventListener("click", () => {
+    if (!clearStepConfirm) {
+      clearStepConfirm = true;
+      clearConfirmText.hidden = false;
+      clearDoBtn.textContent = "Ja, löschen";
+      return;
+    }
+
+    const choice = getClearChoice();
+    doClearAction(choice);
+    closeClearModal();
+  });
+
+  // ---------- Notes Modal ----------
   let editingDateKey = null;
   let editingCell = null;
 
@@ -237,16 +425,9 @@
     closeNoteModal();
   };
 
-  noteModal.addEventListener("click", (e) => {
-    if (e.target === noteModal) closeNoteModal();
-  });
+  // WICHTIG: kein Outside-Click-Schließen, kein ESC-Schließen
   noteCancelBtn.addEventListener("click", closeNoteModal);
   noteSaveBtn.addEventListener("click", saveNoteFromModal);
-
-  window.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && !noteModal.hidden) closeNoteModal();
-    if ((e.ctrlKey || e.metaKey) && e.key === "Enter" && !noteModal.hidden) saveNoteFromModal();
-  });
 
   // ---------- Rendering ----------
   let minYear = null;
@@ -257,6 +438,7 @@
     wrap.className = "year";
     wrap.dataset.year = String(year);
 
+    // Header
     const header = document.createElement("div");
     header.className = "year-header";
 
@@ -274,6 +456,7 @@
     }
     wrap.appendChild(header);
 
+    // Monate
     for (let m = 0; m < 12; m++) {
       const row = document.createElement("div");
       row.className = "month-row";
@@ -307,10 +490,12 @@
           if (key === todayKey) cell.classList.add("today");
 
           const storedMarker = markerMap[key];
-          if (storedMarker) applyMarkerToCell(cell, storedMarker);
+          if (storedMarker && isValidMarkerId(storedMarker)) applyMarkerToCell(cell, storedMarker);
 
           const storedNote = noteMap[key];
-          if (storedNote) applyNoteToCell(cell, storedNote);
+          if (typeof storedNote === "string" && storedNote.trim().length > 0) {
+            applyNoteToCell(cell, storedNote);
+          }
         }
 
         row.appendChild(cell);
@@ -470,28 +655,36 @@
   const init = () => {
     renderSwatches();
 
-    clearAllBtn.addEventListener("click", clearAllColors);
+    // Tools
+    penToolBtn.addEventListener("click", () => setMode(mode === "pen" ? "color" : "pen"));
+    eraserToolBtn.addEventListener("click", () => setMode(mode === "erase" ? "color" : "erase"));
 
-    penToolBtn.addEventListener("click", () => {
-      setMode(mode === "pen" ? "color" : "pen");
-    });
+    // Clear menu
+    clearBtn.addEventListener("click", openClearModal);
 
-    eraserToolBtn.addEventListener("click", () => {
-      setMode(mode === "erase" ? "color" : "erase");
+    // Export / Import
+    exportBtn.addEventListener("click", exportData);
+    importBtn.addEventListener("click", () => importFile.click());
+    importFile.addEventListener("change", async () => {
+      const file = importFile.files && importFile.files[0];
+      importFile.value = "";
+      if (!file) return;
+      await importDataFromFile(file);
     });
 
     setMode("color");
 
+    // Initial render
     minYear = todayYear - INITIAL_YEARS_BEFORE;
     maxYear = todayYear + INITIAL_YEARS_AFTER;
-
     renderYears(minYear, maxYear, { prepend: false });
 
     requestAnimationFrame(() => centerToday());
 
     calendarEl.addEventListener("click", onCalendarClick);
+
+    setupObservers();
   };
 
   init();
-  setupObservers();
 })();

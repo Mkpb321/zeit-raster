@@ -27,8 +27,17 @@
         title="Radierer (Farben entfernen; Shift+Klick = Range löschen)"
       >⌫</button>
 
-      <button id="clearAll" type="button" class="clear-all" title="Löscht alle Farben (Notizen bleiben)">
-        Clear all
+      <button id="exportBtn" type="button" class="tool-btn wide" title="Export (Backup-Datei)">
+        Export
+      </button>
+
+      <button id="importBtn" type="button" class="tool-btn wide" title="Import (Backup-Datei laden)">
+        Import
+      </button>
+      <input id="importFile" type="file" accept="application/json,.json" hidden />
+
+      <button id="clearBtn" type="button" class="clear-all" title="Löschen-Menü">
+        Clear
       </button>
     </header>
 
@@ -39,7 +48,7 @@
     </div>
   </main>
 
-  <!-- Minimaler Notiz-Dialog -->
+  <!-- Notiz-Dialog -->
   <div id="noteModal" class="modal" hidden aria-hidden="true">
     <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="noteTitle">
       <div class="modal-head">
@@ -52,6 +61,40 @@
       <div class="modal-actions">
         <button id="noteCancel" type="button" class="modal-btn">Abbrechen</button>
         <button id="noteSave" type="button" class="modal-btn primary">Speichern</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Clear-Menü -->
+  <div id="clearModal" class="modal" hidden aria-hidden="true">
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="clearTitle">
+      <div class="modal-head">
+        <div id="clearTitle" class="modal-title">Löschen</div>
+        <div class="modal-date"></div>
+      </div>
+
+      <div class="modal-body">
+        <label class="radio-row">
+          <input type="radio" name="clearChoice" value="colors" checked />
+          Nur Farben löschen
+        </label>
+        <label class="radio-row">
+          <input type="radio" name="clearChoice" value="notes" />
+          Nur Notizen löschen
+        </label>
+        <label class="radio-row">
+          <input type="radio" name="clearChoice" value="all" />
+          Alles löschen (Farben + Notizen)
+        </label>
+
+        <div id="clearConfirmText" class="confirm-text" hidden>
+          Bist du sicher? Dieser Vorgang kann nicht rückgängig gemacht werden.
+        </div>
+      </div>
+
+      <div class="modal-actions">
+        <button id="clearCancel" type="button" class="modal-btn">Abbrechen</button>
+        <button id="clearDo" type="button" class="modal-btn primary">Löschen</button>
       </div>
     </div>
   </div>
