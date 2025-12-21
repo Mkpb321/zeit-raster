@@ -8,102 +8,118 @@
   const UI = {};
 
   const isHexColor = (v) => typeof v === "string" && /^#[0-9a-fA-F]{6}$/.test(v.trim());
+  const normHex = (v) => (isHexColor(v) ? v.trim().toLowerCase() : null);
 
-  const normalizeHex = (v) => {
-    if (!isHexColor(v)) return null;
-    return v.trim().toLowerCase();
-  };
+  const builtInColors = () =>
+    CONFIG.MARKERS.map(m => ({ id: m.id, label: m.label, color: m.color }));
 
-  const getBuiltInMarkerColor = (markerDef) => {
-    const v = getComputedStyle(document.documentElement)
-      .getPropertyValue(markerDef.cssVar)
-      .trim();
-    return v || "#fff";
-  };
-
-  const getAllMarkerDefs = (state) => {
+  const allPaletteColors = (state) => {
     const custom = Array.isArray(state.customMarkers) ? state.customMarkers : [];
-    return [...CONFIG.MARKERS, ...custom];
-  };
-
-  const setGlobalCustomMarkers = (state) => {
-    window.KalenderApp.CUSTOM_MARKERS = Array.isArray(state.customMarkers) ? state.customMarkers : [];
+    return [
+      ...builtInColors().map(x => ({ ...x, isCustom: false })),
+      ...custom.map(x => ({ ...x, isCustom: true })),
+    ];
   };
 
   const saveCustomMarkers = (state) => {
-    setGlobalCustomMarkers(state);
-    S.safeSave(CONFIG.STORAGE_CUSTOM_MARKERS, state.customMarkers);
+    const list = Array.isArray(state.customMarkers) ? state.customMarkers : [];
+    S.safeSave(CONFIG.STORAGE_CUSTOM_MARKERS, list);
+  };
+
+  const updateSwatchSelectionUI = (swatchesEl, selectedColorOrNull) => {
+    for (const el of swatchesEl.querySelectorAll('.swatch[data-color]')) {
+      const c = el.getAttribute("data-color");
+      el.setAttribute("aria-checked", String(!!selectedColorOrNull && c === selectedColorOrNull));
+    }
   };
 
   UI.clearColorSelection = (state) => {
-    state.selectedMarkerId = null;
-    if (!state.swatchesEl) return;
-    for (const child of state.swatchesEl.querySelectorAll('.swatch[data-marker-id]')) {
-      child.setAttribute("aria-checked", "false");
+    state.selectedColor = null;
+    if (state.swatchesEl) updateSwatchSelectionUI(state.swatchesEl, null);
+  };
+
+  UI.setMode = (state, mode) => {
+    state.mode = mode;
+    state.penToolBtn.setAttribute("aria-pressed", String(mode === "pen"));
+    state.eraserToolBtn.setAttribute("aria-pressed", String(mode === "erase"));
+
+    if (state.swatchesEl) {
+      updateSwatchSelectionUI(state.swatchesEl, mode === "color" ? state.selectedColor : null);
     }
   };
 
-  const updateSwatchSelectionUI = (swatchesEl, selectedIdOrNull) => {
-    for (const el of swatchesEl.querySelectorAll('.swatch[data-marker-id]')) {
-      const id = el.getAttribute("data-marker-id");
-      el.setAttribute("aria-checked", String(!!selectedIdOrNull && id === selectedIdOrNull));
-    }
+  // ---------- Custom Color Modal ----------
+  UI.openColorModal = (state) => {
+    state.colorPickerEl.value = normHex(state.customColorPickerValue) || "#ffd0d0";
+    state.colorModal.hidden = false;
+    state.colorModal.setAttribute("aria-hidden", "false");
+    setTimeout(() => state.colorAddBtn.focus(), 0);
   };
 
-  UI.addCustomMarker = (state, color) => {
-    const hex = normalizeHex(color);
+  UI.closeColorModal = (state) => {
+    state.colorModal.hidden = true;
+    state.colorModal.setAttribute("aria-hidden", "true");
+  };
+
+  const ensureSelectColor = (state, hex) => {
+    state.selectedColor = hex;
+    UI.setMode(state, "color");
+    if (state.swatchesEl) updateSwatchSelectionUI(state.swatchesEl, hex);
+  };
+
+  UI.addCustomColorFromModal = (state) => {
+    const hex = normHex(state.colorPickerEl.value);
     if (!hex) return;
 
-    const id = `c_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
-    const def = {
-      id,
-      label: hex.toUpperCase(),
-      color: hex,
-      isCustom: true,
-    };
+    state.customColorPickerValue = hex;
 
     state.customMarkers = Array.isArray(state.customMarkers) ? state.customMarkers : [];
-    state.customMarkers.push(def);
+
+    // Duplikate vermeiden: wenn Farbe schon existiert -> nur auswählen
+    const existing = state.customMarkers.find(m => m && normHex(m.color) === hex);
+    if (existing) {
+      ensureSelectColor(state, hex);
+      UI.closeColorModal(state);
+      return;
+    }
+
+    const id = `c_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
+    state.customMarkers.push({
+      id,
+      color: hex,
+      label: hex.toUpperCase(),
+      isCustom: true,
+    });
+
     saveCustomMarkers(state);
-
-    // Neu hinzugefügte Farbe direkt auswählen
-    state.selectedMarkerId = id;
-    UI.setMode(state, "color");
-
     UI.renderSwatches(state.swatchesEl, state);
+    ensureSelectColor(state, hex);
+    UI.closeColorModal(state);
   };
 
-  UI.deleteCustomMarker = (state, markerId) => {
-    const before = Array.isArray(state.customMarkers) ? state.customMarkers : [];
-    const after = before.filter(m => !(m && m.id === markerId));
+  UI.deleteCustomMarker = (state, id) => {
+    state.customMarkers = (Array.isArray(state.customMarkers) ? state.customMarkers : [])
+      .filter(m => !(m && m.id === id));
 
-    state.customMarkers = after;
     saveCustomMarkers(state);
+    UI.renderSwatches(state.swatchesEl, state);
 
-    // MarkerMap bereinigen (sonst bleiben "tote" MarkerIds gespeichert)
-    let changed = false;
-    for (const [k, v] of Object.entries(state.markerMap || {})) {
-      if (v === markerId) {
-        delete state.markerMap[k];
-        changed = true;
+    // Wenn die aktuell gewählte Farbe nicht mehr in der Palette existiert -> abwählen
+    const selected = normHex(state.selectedColor);
+    if (selected) {
+      const stillExists = allPaletteColors(state).some(m => normHex(m.color) === selected);
+      if (!stillExists && state.mode === "color") {
+        UI.clearColorSelection(state);
+        UI.setMode(state, "none");
       }
     }
-    if (changed) S.safeSave(CONFIG.STORAGE_MARKERS, state.markerMap);
-
-    // Wenn gerade ausgewählt: abwählen (kein aktives Werkzeug)
-    if (state.selectedMarkerId === markerId) {
-      UI.clearColorSelection(state);
-      UI.setMode(state, "none");
-    }
-
-    A.applyAllFromMapsToRenderedCells(state.calendarEl, state.markerMap, state.noteMap);
-    UI.renderSwatches(state.swatchesEl, state);
   };
 
+  // ---------- Swatches ----------
   UI.renderSwatches = (swatchesEl, state) => {
     swatchesEl.innerHTML = "";
 
-    const defs = getAllMarkerDefs(state);
+    const defs = allPaletteColors(state);
 
     for (const m of defs) {
       const wrap = document.createElement("div");
@@ -113,21 +129,19 @@
       btn.type = "button";
       btn.className = "swatch";
       btn.setAttribute("role", "radio");
-      btn.setAttribute("data-marker-id", m.id);
       btn.setAttribute("aria-label", m.label || "Farbe");
+      btn.setAttribute("data-color", normHex(m.color) || "");
       btn.setAttribute(
         "aria-checked",
-        String(state.mode === "color" && m.id === state.selectedMarkerId)
+        String(state.mode === "color" && normHex(m.color) === normHex(state.selectedColor))
       );
-
-      if (m.cssVar) {
-        btn.style.background = getBuiltInMarkerColor(m);
-      } else if (typeof m.color === "string") {
-        btn.style.background = m.color;
-      }
+      btn.style.background = m.color;
 
       btn.addEventListener("click", () => {
-        const isAlreadySelected = state.selectedMarkerId === m.id;
+        const c = normHex(m.color);
+        if (!c) return;
+
+        const isAlreadySelected = normHex(state.selectedColor) === c;
 
         // Zweiter Klick auf die gleiche Farbe => abwählen (kein aktives Werkzeug)
         if (isAlreadySelected && state.mode === "color") {
@@ -136,34 +150,30 @@
           return;
         }
 
-        state.selectedMarkerId = m.id;
-        UI.setMode(state, "color");
+        ensureSelectColor(state, c);
       });
 
       wrap.appendChild(btn);
 
-      // Custom Marker: löschbar
-      if (m && m.isCustom) {
+      if (m.isCustom) {
         const del = document.createElement("button");
         del.type = "button";
         del.className = "swatch-del";
         del.setAttribute("aria-label", "Custom-Farbe entfernen");
         del.title = "Farbe entfernen";
         del.textContent = "×";
-
         del.addEventListener("click", (e) => {
           e.preventDefault();
           e.stopPropagation();
           UI.deleteCustomMarker(state, m.id);
         });
-
         wrap.appendChild(del);
       }
 
       swatchesEl.appendChild(wrap);
     }
 
-    // --- Add Controls (Plus + Color Picker) ---
+    // Plus (öffnet Modal) – ohne zusätzliches Farbfeld
     const addWrap = document.createElement("div");
     addWrap.className = "swatch-wrap";
 
@@ -173,37 +183,13 @@
     addBtn.setAttribute("aria-label", "Neue Custom-Farbe hinzufügen");
     addBtn.title = "Neue Farbe hinzufügen";
     addBtn.textContent = "+";
-
-    const colorInput = document.createElement("input");
-    colorInput.type = "color";
-    colorInput.className = "swatch-color";
-    colorInput.setAttribute("aria-label", "Farbe wählen");
-    colorInput.title = "Farbe wählen";
-    colorInput.value = normalizeHex(state.customColorPickerValue) || "#ffd0d0";
-
-    addBtn.addEventListener("click", () => colorInput.click());
-    colorInput.addEventListener("change", () => {
-      state.customColorPickerValue = colorInput.value;
-      UI.addCustomMarker(state, colorInput.value);
-    });
+    addBtn.addEventListener("click", () => UI.openColorModal(state));
 
     addWrap.appendChild(addBtn);
     swatchesEl.appendChild(addWrap);
-    swatchesEl.appendChild(colorInput);
-  };
 
-  UI.setMode = (state, mode) => {
-    state.mode = mode;
-    state.penToolBtn.setAttribute("aria-pressed", String(mode === "pen"));
-    state.eraserToolBtn.setAttribute("aria-pressed", String(mode === "erase"));
-
-    // Farben sind nur im Farbmodus "aktiv"/markiert
-    if (state.swatchesEl) {
-      updateSwatchSelectionUI(
-        state.swatchesEl,
-        mode === "color" ? state.selectedMarkerId : null
-      );
-    }
+    // Falls kein Farbmodus aktiv ist, darf auch nichts als "checked" erscheinen
+    if (state.mode !== "color") updateSwatchSelectionUI(swatchesEl, null);
   };
 
   // ---------- Notes Modal ----------
@@ -269,8 +255,8 @@
 
   UI.doClearAction = (state, choice) => {
     if (choice === "colors") {
-      state.markerMap = {};
-      S.safeSave(CONFIG.STORAGE_MARKERS, state.markerMap);
+      state.colorMap = {};
+      S.safeSave(CONFIG.STORAGE_MARKERS, state.colorMap);
       const anyMarked = state.calendarEl.querySelectorAll(".day-cell[data-marker]");
       for (const cell of anyMarked) A.applyMarkerToCell(cell, null);
       return;
@@ -285,19 +271,19 @@
     }
 
     // all
-    state.markerMap = {};
+    state.colorMap = {};
     state.noteMap = {};
-    S.safeSave(CONFIG.STORAGE_MARKERS, state.markerMap);
+    S.safeSave(CONFIG.STORAGE_MARKERS, state.colorMap);
     S.safeSave(CONFIG.STORAGE_NOTES, state.noteMap);
-    A.applyAllFromMapsToRenderedCells(state.calendarEl, state.markerMap, state.noteMap);
+    A.applyAllFromMapsToRenderedCells(state.calendarEl, state.colorMap, state.noteMap);
   };
 
   // ---------- Export / Import ----------
   UI.exportData = (state) => {
     const payload = {
-      version: 2,
+      version: 3,
       exportedAt: new Date().toISOString(),
-      markers: state.markerMap,
+      colors: state.colorMap, // date -> "#rrggbb"
       notes: state.noteMap,
       customMarkers: Array.isArray(state.customMarkers) ? state.customMarkers : [],
     };
@@ -327,10 +313,11 @@
     URL.revokeObjectURL(a.href);
   };
 
-  const isValidMarkerIdWithCustom = (id, customMarkers) => {
-    if (CONFIG.MARKERS.some(m => m.id === id)) return true;
-    if (!Array.isArray(customMarkers)) return false;
-    return customMarkers.some(m => m && m.id === id && isHexColor(m.color));
+  const colorFromLegacyId = (id) => {
+    if (typeof id !== "string") return null;
+    const built = CONFIG.MARKERS.find(m => m.id === id);
+    if (built && isHexColor(built.color)) return normHex(built.color);
+    return null;
   };
 
   const validateCustomMarkers = (value) => {
@@ -341,7 +328,7 @@
     for (const m of value) {
       if (!m || typeof m !== "object") continue;
       const id = typeof m.id === "string" ? m.id.trim() : "";
-      const color = normalizeHex(m.color);
+      const color = normHex(m.color);
       if (!id || !color) continue;
       if (seen.has(id)) continue;
       seen.add(id);
@@ -366,23 +353,38 @@
       return;
     }
 
-    const markers = obj && obj.markers;
+    // Unterstützt:
+    // - Neu: { colors, notes, customMarkers }
+    // - Alt: { markers, notes, customMarkers } (markers enthält IDs)
+    const colorsLike = (obj && obj.colors) || (obj && obj.markers);
     const notes = obj && obj.notes;
 
-    if (!markers || typeof markers !== "object" || !notes || typeof notes !== "object") {
-      alert("Import fehlgeschlagen: Datei-Format ungültig (markers/notes fehlen). ");
+    if (!colorsLike || typeof colorsLike !== "object" || !notes || typeof notes !== "object") {
+      alert("Import fehlgeschlagen: Datei-Format ungültig (colors/notes fehlen).");
       return;
     }
 
     const nextCustom = validateCustomMarkers(obj.customMarkers);
 
-    const nextMarkers = {};
-    for (const [k, v] of Object.entries(markers)) {
+    const customIdToColor = new Map(nextCustom.map(m => [m.id, normHex(m.color)]));
+
+    const nextColors = {};
+    for (const [k, v] of Object.entries(colorsLike)) {
       if (typeof k !== "string") continue;
-      if (typeof v !== "string") continue;
       if (!/^\d{4}-\d{2}-\d{2}$/.test(k)) continue;
-      if (!isValidMarkerIdWithCustom(v, nextCustom)) continue;
-      nextMarkers[k] = v;
+
+      if (typeof v !== "string") continue;
+
+      // v kann sein:
+      // - "#rrggbb" (neu)
+      // - built-in ID ("yellow") (alt)
+      // - custom ID ("c_...") (alt, wenn customMarkers im Export enthalten waren)
+      let c = normHex(v);
+      if (!c) c = colorFromLegacyId(v);
+      if (!c && customIdToColor.has(v)) c = customIdToColor.get(v) || null;
+
+      if (!c) continue;
+      nextColors[k] = c;
     }
 
     const nextNotes = {};
@@ -397,21 +399,17 @@
     state.customMarkers = nextCustom;
     saveCustomMarkers(state);
 
-    state.markerMap = nextMarkers;
+    state.colorMap = nextColors;
     state.noteMap = nextNotes;
 
-    S.safeSave(CONFIG.STORAGE_MARKERS, state.markerMap);
+    S.safeSave(CONFIG.STORAGE_MARKERS, state.colorMap);
     S.safeSave(CONFIG.STORAGE_NOTES, state.noteMap);
 
-    // Auswahl ggf. ungültig machen
-    const allDefs = getAllMarkerDefs(state);
-    const validSelected = allDefs.some(m => m.id === state.selectedMarkerId);
-    if (!validSelected) {
-      UI.clearColorSelection(state);
-      UI.setMode(state, "none");
-    }
+    // Import ändert nicht automatisch den aktiven Modus: wir lassen es bewusst auf "none"
+    UI.clearColorSelection(state);
+    UI.setMode(state, "none");
 
-    A.applyAllFromMapsToRenderedCells(state.calendarEl, state.markerMap, state.noteMap);
+    A.applyAllFromMapsToRenderedCells(state.calendarEl, state.colorMap, state.noteMap);
     UI.renderSwatches(state.swatchesEl, state);
   };
 

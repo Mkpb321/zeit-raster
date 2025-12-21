@@ -6,27 +6,88 @@
   const CAL = window.KalenderApp.CALENDAR;
   const UI = window.KalenderApp.UI;
 
+  const isHexColor = (v) => typeof v === "string" && /^#[0-9a-fA-F]{6}$/.test(v.trim());
+  const normHex = (v) => (isHexColor(v) ? v.trim().toLowerCase() : null);
+
   const loadCustomMarkers = () => {
-    const raw = S.safeLoad(CONFIG.STORAGE_CUSTOM_MARKERS);
-    const list = Array.isArray(raw) ? raw : [];
+    const raw = S.safeLoad(CONFIG.STORAGE_CUSTOM_MARKERS, []);
+    if (!Array.isArray(raw)) return [];
 
     const out = [];
-    for (const m of list) {
-      if (!m || typeof m !== "object") continue;
-      if (typeof m.id !== "string" || m.id.trim().length === 0) continue;
-      if (typeof m.color !== "string" || !/^#[0-9a-fA-F]{6}$/.test(m.color.trim())) continue;
+    const seen = new Set();
 
+    for (const m of raw) {
+      if (!m || typeof m !== "object") continue;
+      const id = typeof m.id === "string" ? m.id.trim() : "";
+      const color = normHex(m.color);
+      if (!id || !color) continue;
+      if (seen.has(id)) continue;
+      seen.add(id);
       out.push({
-        id: m.id.trim(),
-        label: (typeof m.label === "string" && m.label.trim().length > 0) ? m.label : m.color.trim().toUpperCase(),
-        color: m.color.trim().toLowerCase(),
+        id,
+        color,
+        label: (typeof m.label === "string" && m.label.trim()) ? m.label : color.toUpperCase(),
         isCustom: true,
       });
     }
+
     return out;
   };
 
-  // DOM Refs
+  const builtInIdToColor = (id) => {
+    if (typeof id !== "string") return null;
+    const def = CONFIG.MARKERS.find(m => m.id === id);
+    return def ? normHex(def.color) : null;
+  };
+
+  const loadColorMap = (customMarkers) => {
+    // Neu (V4): date -> "#rrggbb"
+    const current = S.safeLoad(CONFIG.STORAGE_MARKERS, {});
+    const hasAny = current && typeof current === "object" && Object.keys(current).length > 0;
+
+    // Wenn bereits V4 vorhanden, nur validieren
+    if (hasAny) {
+      const out = {};
+      for (const [k, v] of Object.entries(current)) {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(k)) continue;
+        const c = normHex(v);
+        if (!c) continue;
+        out[k] = c;
+      }
+      // Optional: zurückspeichern, falls bereinigt
+      S.safeSave(CONFIG.STORAGE_MARKERS, out);
+      return out;
+    }
+
+    // Legacy (V3): date -> markerId (built-in) oder customId
+    const legacy = S.safeLoad(CONFIG.STORAGE_MARKERS_LEGACY, {});
+    if (!legacy || typeof legacy !== "object" || Object.keys(legacy).length === 0) {
+      return {};
+    }
+
+    const customIdToColor = new Map(
+      (Array.isArray(customMarkers) ? customMarkers : []).map(m => [m.id, normHex(m.color)])
+    );
+
+    const migrated = {};
+    for (const [k, v] of Object.entries(legacy)) {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(k)) continue;
+      if (typeof v !== "string") continue;
+
+      let c = normHex(v);
+      if (!c) c = builtInIdToColor(v);
+      if (!c && customIdToColor.has(v)) c = customIdToColor.get(v) || null;
+      if (!c) continue;
+
+      migrated[k] = c;
+    }
+
+    // In neues Format speichern (Farbcodes)
+    S.safeSave(CONFIG.STORAGE_MARKERS, migrated);
+    return migrated;
+  };
+
+  // DOM Refs / App-State
   const state = {
     scroller: document.getElementById("scroller"),
     calendarEl: document.getElementById("calendar"),
@@ -46,21 +107,28 @@
     infoModal: document.getElementById("infoModal"),
     infoCloseBtn: document.getElementById("infoClose"),
 
+    // Notiz
     noteModal: document.getElementById("noteModal"),
     noteDateEl: document.getElementById("noteDate"),
     noteTextEl: document.getElementById("noteText"),
     noteSaveBtn: document.getElementById("noteSave"),
     noteCancelBtn: document.getElementById("noteCancel"),
 
+    // Clear
     clearModal: document.getElementById("clearModal"),
     clearCancelBtn: document.getElementById("clearCancel"),
     clearDoBtn: document.getElementById("clearDo"),
     clearConfirmText: document.getElementById("clearConfirmText"),
 
+    // Custom Color Modal
+    colorModal: document.getElementById("colorModal"),
+    colorPickerEl: document.getElementById("colorPicker"),
+    colorCancelBtn: document.getElementById("colorCancel"),
+    colorAddBtn: document.getElementById("colorAdd"),
+
     // State
-    // Beim Laden soll KEIN Werkzeug/Farbe aktiv sein:
-    mode: "none",                 // "none" | "color" | "pen" | "erase"
-    selectedMarkerId: null,       // keine Farbe vorselektiert
+    mode: "none",           // "none" | "color" | "pen" | "erase"
+    selectedColor: null,    // "#rrggbb" oder null
 
     customMarkers: loadCustomMarkers(),
     customColorPickerValue: "#ffd0d0",
@@ -70,8 +138,8 @@
 
     clearStepConfirm: false,
 
-    markerMap: S.safeLoad(CONFIG.STORAGE_MARKERS),
-    noteMap: S.safeLoad(CONFIG.STORAGE_NOTES),
+    colorMap: {},                   // date -> "#rrggbb"
+    noteMap: S.safeLoad(CONFIG.STORAGE_NOTES, {}),
 
     minYear: null,
     maxYear: null,
@@ -84,24 +152,14 @@
     dragActive: false,
     dragStarted: false,
     dragPointerId: null,
-    dragMode: null, // "color" | "erase" | "pen"
-    dragMarkerId: null,
+    dragMode: null,   // "color" | "erase" | "pen"
+    dragColor: null,
     dragStartKey: null,
     dragLastKey: null,
   };
 
-  // Custom Marker Registry für APPLY
-  window.KalenderApp.CUSTOM_MARKERS = state.customMarkers;
-
-  // Ungültige Marker-IDs aus altem Storage bereinigen (z.B. gelöschte Custom-Farben)
-  let pruned = false;
-  for (const [k, v] of Object.entries(state.markerMap)) {
-    if (typeof v !== "string" || !A.isValidMarkerId(v)) {
-      delete state.markerMap[k];
-      pruned = true;
-    }
-  }
-  if (pruned) S.safeSave(CONFIG.STORAGE_MARKERS, state.markerMap);
+  // Farben laden (inkl. Migration)
+  state.colorMap = loadColorMap(state.customMarkers);
 
   // CSS cols setzen
   document.documentElement.style.setProperty("--cols", String(CONFIG.COLS));
@@ -126,16 +184,22 @@
     return getDayCellFromEventTarget(el);
   };
 
-  const applyColorOnKey = (key, markerId) => {
-    state.markerMap[key] = markerId;
+  const applyColorOnKey = (key, hexColor) => {
+    const c = normHex(hexColor);
+    if (!c) return;
+    state.colorMap[key] = c;
     const cell = state.calendarEl.querySelector(`.day-cell[data-date="${key}"]`);
-    if (cell) A.applyMarkerToCell(cell, markerId);
+    if (cell) A.applyMarkerToCell(cell, c);
   };
 
   const eraseColorOnKey = (key) => {
-    if (state.markerMap[key] !== undefined) delete state.markerMap[key];
+    if (state.colorMap[key] !== undefined) delete state.colorMap[key];
     const cell = state.calendarEl.querySelector(`.day-cell[data-date="${key}"]`);
     if (cell) A.applyMarkerToCell(cell, null);
+  };
+
+  const saveColors = () => {
+    S.safeSave(CONFIG.STORAGE_MARKERS, state.colorMap);
   };
 
   // Während Drag: Lücken füllen (Range zwischen lastKey und newKey)
@@ -143,7 +207,7 @@
     if (!fromKey || !toKey) return;
 
     if (state.dragMode === "color") {
-      U.iterateRangeKeys(fromKey, toKey, (k) => applyColorOnKey(k, state.dragMarkerId));
+      U.iterateRangeKeys(fromKey, toKey, (k) => applyColorOnKey(k, state.dragColor));
       return;
     }
 
@@ -152,12 +216,8 @@
     }
   };
 
-  const saveMarkers = () => {
-    S.safeSave(CONFIG.STORAGE_MARKERS, state.markerMap);
-  };
-
   // Single click behavior (ohne Drag):
-  // - color: toggle wie bisher (same color => entfernen)
+  // - color: toggle (gleiche Farbe -> entfernen)
   // - erase: entfernen
   // - pen: modal
   const handleSingleClick = (dateKey, cell) => {
@@ -170,21 +230,22 @@
 
     if (state.mode === "erase") {
       eraseColorOnKey(dateKey);
-      saveMarkers();
+      saveColors();
       return;
     }
 
     // color
-    if (!state.selectedMarkerId || !A.isValidMarkerId(state.selectedMarkerId)) return;
-    const selected = state.selectedMarkerId;
-    const current = cell.dataset.marker || null;
+    const selected = normHex(state.selectedColor);
+    if (!selected) return;
+
+    const current = normHex(cell.dataset.marker) || null;
 
     if (current === selected) {
       eraseColorOnKey(dateKey);
     } else {
       applyColorOnKey(dateKey, selected);
     }
-    saveMarkers();
+    saveColors();
   };
 
   // ------- Pointer Drag Painting / Erasing -------
@@ -192,7 +253,7 @@
     if (ev.button !== 0) return;
 
     if (state.mode === "none") return;
-    if (state.mode === "color" && (!state.selectedMarkerId || !A.isValidMarkerId(state.selectedMarkerId))) return;
+    if (state.mode === "color" && !normHex(state.selectedColor)) return;
 
     const cell = getDayCellFromEventTarget(ev.target);
     if (!cell) return;
@@ -220,7 +281,7 @@
     state.dragStarted = false;
     state.dragPointerId = ev.pointerId;
     state.dragMode = (state.mode === "erase") ? "erase" : "color";
-    state.dragMarkerId = state.selectedMarkerId;
+    state.dragColor = normHex(state.selectedColor);
 
     state.dragStartKey = dateKey;
     state.dragLastKey = dateKey;
@@ -247,7 +308,7 @@
     applyDragRangeStep(state.dragLastKey, key);
 
     state.dragLastKey = key;
-    saveMarkers();
+    saveColors();
   };
 
   const onPointerUpOrCancel = (ev) => {
@@ -267,7 +328,7 @@
       // Bei Drag: letzter Schritt (falls Up auf neuem Feld)
       if (state.dragMode !== "pen" && endKey && endKey !== state.dragLastKey) {
         applyDragRangeStep(state.dragLastKey, endKey);
-        saveMarkers();
+        saveColors();
       }
     }
 
@@ -275,7 +336,7 @@
     state.dragStarted = false;
     state.dragPointerId = null;
     state.dragMode = null;
-    state.dragMarkerId = null;
+    state.dragColor = null;
     state.dragStartKey = null;
     state.dragLastKey = null;
 
@@ -296,7 +357,7 @@
 
   // ------- Render / Infinite Scroll -------
   const buildYearFn = (y) =>
-    CAL.buildYear(y, state.todayKey, state.markerMap, state.noteMap, state.monthFmt);
+    CAL.buildYear(y, state.todayKey, state.colorMap, state.noteMap, state.monthFmt);
 
   const renderInitial = () => {
     state.minYear = state.todayYear - CONFIG.INITIAL_YEARS_BEFORE;
@@ -331,20 +392,24 @@
   const wireUI = () => {
     UI.renderSwatches(state.swatchesEl, state);
 
+    // Stift: zweiter Klick deaktiviert; beim Aktivieren darf keine Farbe aktiv sein
     state.penToolBtn.addEventListener("click", () => {
       if (state.mode === "pen") {
         UI.setMode(state, "none");
         return;
       }
-
-      // Stift wählen => keine Farbe ausgewählt
       UI.clearColorSelection(state);
       UI.setMode(state, "pen");
     });
 
+    // Radierer: zweiter Klick deaktiviert
     state.eraserToolBtn.addEventListener("click", () => {
       UI.setMode(state, state.mode === "erase" ? "none" : "erase");
     });
+
+    // Color Modal
+    state.colorCancelBtn.addEventListener("click", () => UI.closeColorModal(state));
+    state.colorAddBtn.addEventListener("click", () => UI.addCustomColorFromModal(state));
 
     // Note modal: nur Buttons schließen
     state.noteCancelBtn.addEventListener("click", () => UI.closeNoteModal(state));
@@ -395,6 +460,7 @@
     state.calendarEl.addEventListener("pointercancel", onPointerUpOrCancel);
 
     // Beim Laden: bewusst kein aktiver Modus / keine Farbe aktiv
+    UI.clearColorSelection(state);
     UI.setMode(state, "none");
   };
 

@@ -5,53 +5,33 @@
 
   const A = {};
 
-  const getCustomMarkers = () => {
-    const list = window.KalenderApp.CUSTOM_MARKERS;
-    return Array.isArray(list) ? list : [];
-  };
+  const isHexColor = (v) => typeof v === "string" && /^#[0-9a-fA-F]{6}$/.test(v.trim());
+  const normHex = (v) => (isHexColor(v) ? v.trim().toLowerCase() : null);
 
-  const findMarkerDef = (id) => {
-    if (!id) return null;
+  A.isValidColor = (v) => !!normHex(v);
+  // Backwards-compat alias (alte Stellen im Code)
+  A.isValidMarkerId = A.isValidColor;
 
-    const builtIn = CONFIG.MARKERS.find(m => m.id === id);
-    if (builtIn) return { ...builtIn, __type: "builtin" };
-
-    const custom = getCustomMarkers().find(m => m && m.id === id && typeof m.color === "string");
-    if (custom) return { ...custom, __type: "custom" };
-
-    return null;
-  };
-
-  A.isValidMarkerId = (id) => !!findMarkerDef(id);
-
-  A.applyMarkerToCell = (cell, markerIdOrNull) => {
-    // Built-in Klassen entfernen
+  A.applyMarkerToCell = (cell, colorOrNull) => {
+    // Built-in Klassen entfernen (falls vorhanden)
     for (const m of CONFIG.MARKERS) cell.classList.remove(m.className);
 
-    // Custom Marker entfernen
+    // Custom/inline Marker entfernen
     cell.classList.remove("marker-custom");
     cell.style.removeProperty("--m-custom");
 
     delete cell.dataset.marker;
 
-    if (!markerIdOrNull) return;
+    if (!colorOrNull) return;
 
-    const def = findMarkerDef(markerIdOrNull);
-    if (!def) return;
+    const hex = normHex(colorOrNull);
+    if (!hex) return;
 
-    if (def.__type === "builtin") {
-      cell.classList.add(def.className);
-      cell.dataset.marker = def.id;
-      return;
-    }
-
-    // Custom
-    const color = String(def.color).trim();
-    if (!/^#[0-9a-fA-F]{6}$/.test(color)) return;
-
+    // Wir benutzen für ALLE Farben (auch built-in) die Custom-Variante,
+    // damit die Speicherung immer nur den Farbcode benötigt.
     cell.classList.add("marker-custom");
-    cell.style.setProperty("--m-custom", color);
-    cell.dataset.marker = def.id;
+    cell.style.setProperty("--m-custom", hex);
+    cell.dataset.marker = hex;
   };
 
   const setNotePreviewElement = (cell, previewOrNull) => {
@@ -85,13 +65,13 @@
     setNotePreviewElement(cell, U.notePreview(noteTextOrNull));
   };
 
-  A.applyAllFromMapsToRenderedCells = (calendarEl, markerMap, noteMap) => {
+  A.applyAllFromMapsToRenderedCells = (calendarEl, colorMap, noteMap) => {
     const cells = calendarEl.querySelectorAll(".day-cell[data-date]");
     for (const cell of cells) {
       const key = cell.dataset.date;
 
-      const m = markerMap[key];
-      if (m && A.isValidMarkerId(m)) A.applyMarkerToCell(cell, m);
+      const c = colorMap[key];
+      if (A.isValidColor(c)) A.applyMarkerToCell(cell, c);
       else A.applyMarkerToCell(cell, null);
 
       const n = noteMap[key];

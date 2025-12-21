@@ -74,6 +74,28 @@
     </div>
   </div>
 
+  <!-- Custom-Farbe hinzufügen -->
+  <div id="colorModal" class="modal" hidden aria-hidden="true">
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="colorTitle">
+      <div class="modal-head">
+        <div id="colorTitle" class="modal-title">Neue Farbe</div>
+        <div class="modal-date"></div>
+      </div>
+
+      <div class="modal-body">
+        <div class="color-row">
+          <label for="colorPicker">Farbe wählen</label>
+          <input id="colorPicker" class="color-input" type="color" value="#ffd0d0" />
+        </div>
+      </div>
+
+      <div class="modal-actions">
+        <button id="colorCancel" type="button" class="modal-btn">Abbrechen</button>
+        <button id="colorAdd" type="button" class="modal-btn primary">Hinzufügen</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Clear-Menü -->
   <div id="clearModal" class="modal" hidden aria-hidden="true">
     <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="clearTitle">
@@ -132,7 +154,7 @@
             <li>Farbe wählen (Farbkästchen) → Kalender ist im <span class="info-strong">Farbmodus</span>.</li>
             <li><span class="info-strong">Klick</span> auf Tag: Farbe setzen; klickst du die <span class="info-strong">gleiche</span> Farbe erneut → wird entfernt.</li>
             <li><span class="info-strong">Drag</span> (Maustaste halten & ziehen): alle überfahrenen Tage werden sofort in der gewählten Farbe gesetzt.</li>
-            <li>Custom-Farben: <span class="info-strong">+</span> öffnet den Color-Picker; neue Farben haben ein <span class="info-strong">×</span> zum Entfernen.</li>
+            <li>Custom-Farben: <span class="info-strong">+</span> öffnet den Dialog; hinzugefügte Farben haben ein <span class="info-strong">×</span> zum Entfernen aus der Palette.</li>
           </ul>
         </div>
 
@@ -166,9 +188,9 @@
         <div class="info-section">
           <div class="info-h">Backup</div>
           <ul class="info-list">
-            <li><span class="info-strong">Export</span>: lädt eine JSON-Datei mit Farben + Notizen (inkl. Custom-Farben) herunter.</li>
-            <li><span class="info-strong">Import</span>: ersetzt den aktuellen Stand (Farben/Notizen/Custom-Farben) durch den Inhalt der Datei.</li>
-            <li>Alles wird weiterhin im Browser gespeichert (localStorage).</li>
+            <li><span class="info-strong">Export</span>: lädt eine JSON-Datei mit Farben + Notizen + Custom-Palette herunter.</li>
+            <li><span class="info-strong">Import</span>: ersetzt den aktuellen Stand (Farben/Notizen/Custom-Palette) durch den Inhalt der Datei.</li>
+            <li>Für eingefärbte Tage wird immer nur der <span class="info-strong">Farbcode</span> gespeichert (auch bei Custom-Farben).</li>
           </ul>
         </div>
       </div>
