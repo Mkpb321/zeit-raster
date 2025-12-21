@@ -19,5 +19,6 @@
 
     STORAGE_MARKERS: "calendarMarkersV3",
     STORAGE_NOTES: "calendarNotesV2",
+    STORAGE_CUSTOM_MARKERS: "calendarCustomMarkersV1",
   };
 })();

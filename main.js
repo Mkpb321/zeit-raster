@@ -6,6 +6,26 @@
   const CAL = window.KalenderApp.CALENDAR;
   const UI = window.KalenderApp.UI;
 
+  const loadCustomMarkers = () => {
+    const raw = S.safeLoad(CONFIG.STORAGE_CUSTOM_MARKERS);
+    const list = Array.isArray(raw) ? raw : [];
+
+    const out = [];
+    for (const m of list) {
+      if (!m || typeof m !== "object") continue;
+      if (typeof m.id !== "string" || m.id.trim().length === 0) continue;
+      if (typeof m.color !== "string" || !/^#[0-9a-fA-F]{6}$/.test(m.color.trim())) continue;
+
+      out.push({
+        id: m.id.trim(),
+        label: (typeof m.label === "string" && m.label.trim().length > 0) ? m.label : m.color.trim().toUpperCase(),
+        color: m.color.trim().toLowerCase(),
+        isCustom: true,
+      });
+    }
+    return out;
+  };
+
   // DOM Refs
   const state = {
     scroller: document.getElementById("scroller"),
@@ -38,8 +58,12 @@
     clearConfirmText: document.getElementById("clearConfirmText"),
 
     // State
-    mode: "color",                 // "none" | "color" | "pen" | "erase"
-    selectedMarkerId: CONFIG.MARKERS[0].id,
+    // Beim Laden soll KEIN Werkzeug/Farbe aktiv sein:
+    mode: "none",                 // "none" | "color" | "pen" | "erase"
+    selectedMarkerId: null,       // keine Farbe vorselektiert
+
+    customMarkers: loadCustomMarkers(),
+    customColorPickerValue: "#ffd0d0",
 
     editingDateKey: null,
     editingCell: null,
@@ -58,13 +82,26 @@
 
     // Drag state
     dragActive: false,
-    dragStarted: false,   // ob schon echte Drag-Bewegung auf ein anderes Feld passiert ist
+    dragStarted: false,
     dragPointerId: null,
-    dragMode: null,       // "color" | "erase" | "pen"
+    dragMode: null, // "color" | "erase" | "pen"
     dragMarkerId: null,
     dragStartKey: null,
     dragLastKey: null,
   };
+
+  // Custom Marker Registry für APPLY
+  window.KalenderApp.CUSTOM_MARKERS = state.customMarkers;
+
+  // Ungültige Marker-IDs aus altem Storage bereinigen (z.B. gelöschte Custom-Farben)
+  let pruned = false;
+  for (const [k, v] of Object.entries(state.markerMap)) {
+    if (typeof v !== "string" || !A.isValidMarkerId(v)) {
+      delete state.markerMap[k];
+      pruned = true;
+    }
+  }
+  if (pruned) S.safeSave(CONFIG.STORAGE_MARKERS, state.markerMap);
 
   // CSS cols setzen
   document.documentElement.style.setProperty("--cols", String(CONFIG.COLS));
@@ -138,7 +175,7 @@
     }
 
     // color
-    if (!state.selectedMarkerId) return;
+    if (!state.selectedMarkerId || !A.isValidMarkerId(state.selectedMarkerId)) return;
     const selected = state.selectedMarkerId;
     const current = cell.dataset.marker || null;
 
@@ -155,7 +192,7 @@
     if (ev.button !== 0) return;
 
     if (state.mode === "none") return;
-    if (state.mode === "color" && !state.selectedMarkerId) return;
+    if (state.mode === "color" && (!state.selectedMarkerId || !A.isValidMarkerId(state.selectedMarkerId))) return;
 
     const cell = getDayCellFromEventTarget(ev.target);
     if (!cell) return;
@@ -184,12 +221,7 @@
     state.dragPointerId = ev.pointerId;
     state.dragMode = (state.mode === "erase") ? "erase" : "color";
     state.dragMarkerId = state.selectedMarkerId;
-    if (state.dragMode === "color" && !state.dragMarkerId) {
-      state.dragActive = false;
-      state.dragPointerId = null;
-      state.dragMode = null;
-      return;
-    }
+
     state.dragStartKey = dateKey;
     state.dragLastKey = dateKey;
 
@@ -300,7 +332,6 @@
     UI.renderSwatches(state.swatchesEl, state);
 
     state.penToolBtn.addEventListener("click", () => {
-      // Zweiter Klick auf Stift => abwählen (kein aktives Werkzeug)
       if (state.mode === "pen") {
         UI.setMode(state, "none");
         return;
@@ -312,7 +343,6 @@
     });
 
     state.eraserToolBtn.addEventListener("click", () => {
-      // Zweiter Klick auf Radierer => abwählen (kein aktives Werkzeug)
       UI.setMode(state, state.mode === "erase" ? "none" : "erase");
     });
 
@@ -364,8 +394,8 @@
     state.calendarEl.addEventListener("pointerup", onPointerUpOrCancel);
     state.calendarEl.addEventListener("pointercancel", onPointerUpOrCancel);
 
-    // Default mode
-    UI.setMode(state, "color");
+    // Beim Laden: bewusst kein aktiver Modus / keine Farbe aktiv
+    UI.setMode(state, "none");
   };
 
   // ------- Init -------

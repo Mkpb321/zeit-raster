@@ -5,18 +5,53 @@
 
   const A = {};
 
-  A.isValidMarkerId = (id) => CONFIG.MARKERS.some(m => m.id === id);
+  const getCustomMarkers = () => {
+    const list = window.KalenderApp.CUSTOM_MARKERS;
+    return Array.isArray(list) ? list : [];
+  };
+
+  const findMarkerDef = (id) => {
+    if (!id) return null;
+
+    const builtIn = CONFIG.MARKERS.find(m => m.id === id);
+    if (builtIn) return { ...builtIn, __type: "builtin" };
+
+    const custom = getCustomMarkers().find(m => m && m.id === id && typeof m.color === "string");
+    if (custom) return { ...custom, __type: "custom" };
+
+    return null;
+  };
+
+  A.isValidMarkerId = (id) => !!findMarkerDef(id);
 
   A.applyMarkerToCell = (cell, markerIdOrNull) => {
+    // Built-in Klassen entfernen
     for (const m of CONFIG.MARKERS) cell.classList.remove(m.className);
+
+    // Custom Marker entfernen
+    cell.classList.remove("marker-custom");
+    cell.style.removeProperty("--m-custom");
+
     delete cell.dataset.marker;
 
     if (!markerIdOrNull) return;
-    if (!A.isValidMarkerId(markerIdOrNull)) return;
 
-    const m = CONFIG.MARKERS.find(x => x.id === markerIdOrNull);
-    cell.classList.add(m.className);
-    cell.dataset.marker = markerIdOrNull;
+    const def = findMarkerDef(markerIdOrNull);
+    if (!def) return;
+
+    if (def.__type === "builtin") {
+      cell.classList.add(def.className);
+      cell.dataset.marker = def.id;
+      return;
+    }
+
+    // Custom
+    const color = String(def.color).trim();
+    if (!/^#[0-9a-fA-F]{6}$/.test(color)) return;
+
+    cell.classList.add("marker-custom");
+    cell.style.setProperty("--m-custom", color);
+    cell.dataset.marker = def.id;
   };
 
   const setNotePreviewElement = (cell, previewOrNull) => {
