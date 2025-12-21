@@ -7,6 +7,14 @@
 
   const UI = {};
 
+  UI.clearColorSelection = (state) => {
+    state.selectedMarkerId = null;
+    if (!state.swatchesEl) return;
+    for (const child of state.swatchesEl.querySelectorAll(".swatch")) {
+      child.setAttribute("aria-checked", "false");
+    }
+  };
+
   UI.renderSwatches = (swatchesEl, state) => {
     swatchesEl.innerHTML = "";
 
@@ -22,6 +30,15 @@
         getComputedStyle(document.documentElement).getPropertyValue(m.cssVar).trim() || "#fff";
 
       btn.addEventListener("click", () => {
+        const isAlreadySelected = state.selectedMarkerId === m.id;
+
+        // Zweiter Klick auf die gleiche Farbe => abwählen (kein aktives Werkzeug)
+        if (isAlreadySelected && state.mode === "color") {
+          UI.clearColorSelection(state);
+          UI.setMode(state, "none");
+          return;
+        }
+
         state.selectedMarkerId = m.id;
 
         for (const child of swatchesEl.querySelectorAll(".swatch")) {
@@ -142,9 +159,17 @@
     const blob = new Blob([json], { type: "application/json" });
 
     const ts = new Date();
-    const name =
-      `calendar-backup-${ts.getFullYear()}${U.pad2(ts.getMonth() + 1)}${U.pad2(ts.getDate())}-` +
+    const defaultName =
+      `zeit-raster-backup-${ts.getFullYear()}${U.pad2(ts.getMonth() + 1)}${U.pad2(ts.getDate())}-` +
       `${U.pad2(ts.getHours())}${U.pad2(ts.getMinutes())}${U.pad2(ts.getSeconds())}.json`;
+
+    const inputName = window.prompt("Dateiname für Export:", defaultName);
+    if (inputName === null) return;
+
+    const trimmed = String(inputName).trim();
+    if (!trimmed) return;
+
+    const name = trimmed.toLowerCase().endsWith(".json") ? trimmed : `${trimmed}.json`;
 
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);

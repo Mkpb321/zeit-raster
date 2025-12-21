@@ -38,7 +38,7 @@
     clearConfirmText: document.getElementById("clearConfirmText"),
 
     // State
-    mode: "color",                 // "color" | "pen" | "erase"
+    mode: "color",                 // "none" | "color" | "pen" | "erase"
     selectedMarkerId: CONFIG.MARKERS[0].id,
 
     editingDateKey: null,
@@ -124,6 +124,8 @@
   // - erase: entfernen
   // - pen: modal
   const handleSingleClick = (dateKey, cell) => {
+    if (state.mode === "none") return;
+
     if (state.mode === "pen") {
       UI.openNoteModal(state, dateKey, cell);
       return;
@@ -136,6 +138,7 @@
     }
 
     // color
+    if (!state.selectedMarkerId) return;
     const selected = state.selectedMarkerId;
     const current = cell.dataset.marker || null;
 
@@ -150,6 +153,9 @@
   // ------- Pointer Drag Painting / Erasing -------
   const onPointerDown = (ev) => {
     if (ev.button !== 0) return;
+
+    if (state.mode === "none") return;
+    if (state.mode === "color" && !state.selectedMarkerId) return;
 
     const cell = getDayCellFromEventTarget(ev.target);
     if (!cell) return;
@@ -178,6 +184,12 @@
     state.dragPointerId = ev.pointerId;
     state.dragMode = (state.mode === "erase") ? "erase" : "color";
     state.dragMarkerId = state.selectedMarkerId;
+    if (state.dragMode === "color" && !state.dragMarkerId) {
+      state.dragActive = false;
+      state.dragPointerId = null;
+      state.dragMode = null;
+      return;
+    }
     state.dragStartKey = dateKey;
     state.dragLastKey = dateKey;
 
@@ -288,11 +300,20 @@
     UI.renderSwatches(state.swatchesEl, state);
 
     state.penToolBtn.addEventListener("click", () => {
-      UI.setMode(state, state.mode === "pen" ? "color" : "pen");
+      // Zweiter Klick auf Stift => abwählen (kein aktives Werkzeug)
+      if (state.mode === "pen") {
+        UI.setMode(state, "none");
+        return;
+      }
+
+      // Stift wählen => keine Farbe ausgewählt
+      UI.clearColorSelection(state);
+      UI.setMode(state, "pen");
     });
 
     state.eraserToolBtn.addEventListener("click", () => {
-      UI.setMode(state, state.mode === "erase" ? "color" : "erase");
+      // Zweiter Klick auf Radierer => abwählen (kein aktives Werkzeug)
+      UI.setMode(state, state.mode === "erase" ? "none" : "erase");
     });
 
     // Note modal: nur Buttons schließen
