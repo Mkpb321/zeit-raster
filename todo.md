@@ -1,3 +1,5 @@
+ma kann den eigenen farben namen geben, damit man weiss, was man grossflächig gemeint hat, oder irgendwie flächen beschrieften, die dann tooltipmässig angezeigt werden
+
 
 alles nicht in local storage sondern firestore mit usern? bzw falls user angemeldet dan so?
 
