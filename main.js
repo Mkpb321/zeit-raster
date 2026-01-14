@@ -34,6 +34,83 @@
     document.documentElement.setAttribute("data-theme", t);
   };
 
+  // ---- Chrome (Hintergrund + Header/Label-Textfarbe) ----
+  const clamp01 = (n, min, max) => Math.min(max, Math.max(min, n));
+
+  const percentToGray = (percent) => {
+    const p = clamp01(Number(percent), 0, 100);
+    const v = Math.round(255 * (p / 100));
+    return `rgb(${v} ${v} ${v})`;
+  };
+
+  const getDefaultChromeBgPercent = (theme) => (theme === THEME.LIGHT ? 100 : 0);
+  const getDefaultChromeTextIsWhite = (theme) => (theme === THEME.DARK);
+
+  const getStoredChromeBgPercent = () => {
+    try {
+      const raw = localStorage.getItem(CONFIG.STORAGE_CHROME_BG);
+      if (raw === null || raw === undefined || raw === "") return null;
+      const n = parseInt(raw, 10);
+      if (!Number.isFinite(n)) return null;
+      return clamp01(n, 0, 100);
+    } catch {
+      return null;
+    }
+  };
+
+  const setStoredChromeBgPercent = (percentOrNull) => {
+    try {
+      if (percentOrNull === null) {
+        localStorage.removeItem(CONFIG.STORAGE_CHROME_BG);
+        return;
+      }
+      localStorage.setItem(CONFIG.STORAGE_CHROME_BG, String(clamp01(percentOrNull, 0, 100)));
+    } catch {
+      // ignore
+    }
+  };
+
+  const getStoredChromeTextIsWhite = () => {
+    try {
+      const raw = localStorage.getItem(CONFIG.STORAGE_CHROME_FG);
+      if (raw === null || raw === undefined || raw === "") return null;
+      if (raw === "white") return true;
+      if (raw === "black") return false;
+      return null;
+    } catch {
+      return null;
+    }
+  };
+
+  const setStoredChromeTextIsWhite = (isWhiteOrNull) => {
+    try {
+      if (isWhiteOrNull === null) {
+        localStorage.removeItem(CONFIG.STORAGE_CHROME_FG);
+        return;
+      }
+      localStorage.setItem(CONFIG.STORAGE_CHROME_FG, isWhiteOrNull ? "white" : "black");
+    } catch {
+      // ignore
+    }
+  };
+
+  const applyChromeBg = (percentOrNull) => {
+    if (percentOrNull === null) {
+      document.documentElement.style.removeProperty("--chrome-bg");
+      return;
+    }
+    const p = clamp01(percentOrNull, 0, 100);
+    document.documentElement.style.setProperty("--chrome-bg", percentToGray(p));
+  };
+
+  const applyChromeText = (isWhiteOrNull) => {
+    if (isWhiteOrNull === null) {
+      document.documentElement.style.removeProperty("--chrome-fg");
+      return;
+    }
+    document.documentElement.style.setProperty("--chrome-fg", isWhiteOrNull ? "#fff" : "#000");
+  };
+
   const isHexColor = (v) => typeof v === "string" && /^#[0-9a-fA-F]{6}$/.test(v.trim());
   const normHex = (v) => (isHexColor(v) ? v.trim().toLowerCase() : null);
 
@@ -135,6 +212,9 @@
 
     // Theme
     themeBtn: document.getElementById("themeBtn"),
+    chromeTextToggle: document.getElementById("chromeTextToggle"),
+    chromeBgRange: document.getElementById("chromeBgRange"),
+    chromeBgLabel: document.getElementById("chromeBgLabel"),
     infoModal: document.getElementById("infoModal"),
     infoCloseBtn: document.getElementById("infoClose"),
 
@@ -160,6 +240,10 @@
     // State
     mode: "none",           // "none" | "color" | "pen" | "erase"
     selectedColor: null,    // "#rrggbb" oder null
+
+    // Theme-Overrides
+    chromeBgPercent: null,      // null = auto, sonst 0..100
+    chromeTextIsWhite: null,    // null = auto, sonst boolean
 
     customMarkers: loadCustomMarkers(),
     customColorPickerValue: "#ffd0d0",
@@ -187,6 +271,10 @@
     dragColor: null,
     dragStartKey: null,
     dragLastKey: null,
+
+    // Chrome Overrides
+    chromeBgPercent: null,        // null => Auto (Theme), sonst 0..100
+    chromeTextIsWhite: null,      // null => Auto (Theme), sonst boolean
   };
 
   const syncThemeButton = () => {
@@ -196,16 +284,52 @@
     state.themeBtn.setAttribute("aria-pressed", isDark ? "true" : "false");
   };
 
+  const getChromeBgUiValue = () => {
+    return state.chromeBgPercent === null
+      ? getDefaultChromeBgPercent(state.theme)
+      : clamp01(state.chromeBgPercent, 0, 100);
+  };
+
+  const getChromeTextUiValue = () => {
+    return state.chromeTextIsWhite === null
+      ? getDefaultChromeTextIsWhite(state.theme)
+      : Boolean(state.chromeTextIsWhite);
+  };
+
+  const syncChromeControls = () => {
+    if (state.chromeTextToggle) {
+      const isWhite = getChromeTextUiValue();
+      state.chromeTextToggle.checked = isWhite;
+      state.chromeTextToggle.setAttribute("aria-checked", isWhite ? "true" : "false");
+    }
+
+    if (state.chromeBgRange) {
+      const p = getChromeBgUiValue();
+      state.chromeBgRange.value = String(p);
+      if (state.chromeBgLabel) state.chromeBgLabel.textContent = `${p}%`;
+    }
+  };
+
   const setTheme = (theme, { persist } = { persist: true }) => {
     const t = theme === THEME.LIGHT ? THEME.LIGHT : THEME.DARK;
     state.theme = t;
     applyTheme(t);
     if (persist) setStoredTheme(t);
     syncThemeButton();
+    syncChromeControls();
   };
 
   // Initial theme (default: dunkel)
   setTheme(getStoredTheme(), { persist: false });
+
+  // Chrome-Overrides laden (falls gesetzt). Wenn nichts gespeichert ist, bleibt es "auto"
+  // und folgt dem Theme.
+  state.chromeBgPercent = getStoredChromeBgPercent();
+  state.chromeTextIsWhite = getStoredChromeTextIsWhite();
+
+  applyChromeBg(state.chromeBgPercent);
+  applyChromeText(state.chromeTextIsWhite);
+  syncChromeControls();
 
   // Farben laden (inkl. Migration)
   state.colorMap = loadColorMap(state.customMarkers);
@@ -445,6 +569,28 @@
     if (state.themeBtn) {
       state.themeBtn.addEventListener("click", () => {
         setTheme(state.theme === THEME.DARK ? THEME.LIGHT : THEME.DARK, { persist: true });
+      });
+    }
+
+    // Chrome: Header/Label-Textfarbe (Monate/Jahre/Wochentage)
+    if (state.chromeTextToggle) {
+      state.chromeTextToggle.addEventListener("change", () => {
+        const isWhite = Boolean(state.chromeTextToggle.checked);
+        state.chromeTextIsWhite = isWhite;
+        applyChromeText(state.chromeTextIsWhite);
+        setStoredChromeTextIsWhite(state.chromeTextIsWhite);
+        syncChromeControls();
+      });
+    }
+
+    // Chrome: Hintergrund-Regler (0..100%)
+    if (state.chromeBgRange) {
+      state.chromeBgRange.addEventListener("input", () => {
+        const p = clamp01(parseInt(state.chromeBgRange.value, 10), 0, 100);
+        state.chromeBgPercent = p;
+        applyChromeBg(state.chromeBgPercent);
+        setStoredChromeBgPercent(state.chromeBgPercent);
+        syncChromeControls();
       });
     }
 

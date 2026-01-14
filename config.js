@@ -27,5 +27,9 @@
 
     // UI
     STORAGE_THEME: "calendarThemeV1", // "dark" | "light"
+
+    // UI-Feintuning (Theme-Overrides)
+    STORAGE_CHROME_BG: "calendarChromeBgV1",  // "0".."100" (Prozent, 0=schwarz, 100=weiß)
+    STORAGE_CHROME_FG: "calendarChromeFgV1",  // "white" | "black"
   };
 })();

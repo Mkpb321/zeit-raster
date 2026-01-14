@@ -2,14 +2,17 @@
   --line:#000;
   --bg:#fff;
   --weekend:#f0f0f0;
-  /* Theme (default: dunkel wie aktuell) */
-  --page-bg:#000;
-  --label-bg:#000;
-  --label-fg:#fff;
-  --weekday-bg:#000;
-  --weekday-fg:#fff;
-  --weekday-weekend-bg:#000;
-  --empty-bg:#000;
+  /* Theme (default: dunkel wie aktuell)
+     "Chrome" = Hintergrund/Label/Leerfelder/Wochentagsleiste (nicht die Tageszellen). */
+  --chrome-bg:#000;
+  --chrome-fg:#fff;
+  --page-bg: var(--chrome-bg);
+  --label-bg: var(--chrome-bg);
+  --label-fg: var(--chrome-fg);
+  --weekday-bg: var(--chrome-bg);
+  --weekday-fg: var(--chrome-fg);
+  --weekday-weekend-bg: var(--chrome-bg);
+  --empty-bg: var(--chrome-bg);
 
   /* Built-in Markerfarben (werden zusätzlich in config.js geführt) */
   --m-yellow: #fff3b0;
@@ -26,13 +29,8 @@
 
 :root[data-theme="light"]{
   /* Theme: hell (ursprünglicher Look) */
-  --page-bg:#fff;
-  --label-bg:#fff;
-  --label-fg:#000;
-  --weekday-bg:#fff;
-  --weekday-fg:#000;
-  --weekday-weekend-bg:var(--weekend);
-  --empty-bg:#fff;
+  --chrome-bg:#fff;
+  --chrome-fg:#000;
 }
 
 :root[data-theme="light"] .label-cell{
@@ -148,6 +146,37 @@ html, body{
 
 .theme-btn{
   margin-left:auto;
+}
+
+/* Toolbar: Theme-Controls */
+.toggle-control,
+.range-control{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  height:22px;
+  border:1px solid var(--line);
+  padding:0 8px;
+  background:var(--bg);
+  font-size:12px;
+}
+
+.toggle-control input{
+  margin:0;
+}
+
+.range-control input[type="range"]{
+  width: 110px;
+}
+
+.range-label{
+  font-weight:600;
+}
+
+.range-value{
+  min-width: 36px;
+  text-align:right;
+  font-variant-numeric: tabular-nums;
 }
 
 .clear-all{
