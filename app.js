@@ -479,7 +479,7 @@
 
         if (dayNum < 1 || dayNum > dim) {
           cell.classList.add("empty");
-          cell.textContent = "0";
+          cell.textContent = "";
         } else {
           cell.textContent = String(dayNum);
 

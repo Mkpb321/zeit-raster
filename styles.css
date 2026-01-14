@@ -2,6 +2,7 @@
   --line:#000;
   --bg:#fff;
   --weekend:#f0f0f0;
+  --page-bg:#000;
 
   /* Built-in Markerfarben (werden zusätzlich in config.js geführt) */
   --m-yellow: #fff3b0;
@@ -21,7 +22,7 @@
 html, body{
   height:100%;
   margin:0;
-  background:var(--bg);
+  background:var(--page-bg);
   color:#000;
   font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
 }
@@ -31,6 +32,7 @@ html, body{
   width:100%;
   display:flex;
   flex-direction:column;
+  background:var(--page-bg);
 }
 
 /* Toolbar minimal halten */
@@ -141,12 +143,13 @@ html, body{
   width:100%;
   overflow-y:auto;
   overflow-x:hidden;
-  background:var(--bg);
+  background:var(--page-bg);
 }
 
 .calendar{
   width:100%;
   padding:8px;
+  background:var(--page-bg);
 }
 
 /* Jahrblock */
@@ -169,7 +172,8 @@ html, body{
   border-top:1px solid var(--line);
   padding:6px 8px;
   font-weight:600;
-  background:var(--bg);
+  background:#000;
+  color:#fff;
   font-size:12px;
   line-height:1;
   white-space:nowrap;
@@ -210,6 +214,7 @@ html, body{
 }
 
 .day-cell.empty{
+  background:#000;
   color: transparent;
 }
 
