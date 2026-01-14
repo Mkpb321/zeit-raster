@@ -2,7 +2,14 @@
   --line:#000;
   --bg:#fff;
   --weekend:#f0f0f0;
+  /* Theme (default: dunkel wie aktuell) */
   --page-bg:#000;
+  --label-bg:#000;
+  --label-fg:#fff;
+  --weekday-bg:#000;
+  --weekday-fg:#fff;
+  --weekday-weekend-bg:#000;
+  --empty-bg:#000;
 
   /* Built-in Markerfarben (werden zusätzlich in config.js geführt) */
   --m-yellow: #fff3b0;
@@ -15,6 +22,22 @@
   --label-w: 72px;     /* Monat/Jahr-Spalte */
   --cols: 37;          /* lead (0..6) + max 31 Tage => 37 */
   --cell-h: 28px;      /* Zellenhöhe */
+}
+
+:root[data-theme="light"]{
+  /* Theme: hell (ursprünglicher Look) */
+  --page-bg:#fff;
+  --label-bg:#fff;
+  --label-fg:#000;
+  --weekday-bg:#fff;
+  --weekday-fg:#000;
+  --weekday-weekend-bg:var(--weekend);
+  --empty-bg:#fff;
+}
+
+:root[data-theme="light"] .label-cell{
+  text-align:left;
+  justify-content:flex-start;
 }
 
 *{ box-sizing:border-box; }
@@ -123,8 +146,11 @@ html, body{
   outline-offset:2px;
 }
 
-.clear-all{
+.theme-btn{
   margin-left:auto;
+}
+
+.clear-all{
   border:1px solid var(--line);
   background:var(--bg);
   padding:4px 8px;
@@ -135,6 +161,11 @@ html, body{
 
 .clear-all:active{
   transform: translateY(1px);
+}
+
+/* Theme-Toggle rechts ausrichten */
+.theme-btn{
+  margin-left:auto;
 }
 
 /* Nur vertikal scrollen */
@@ -176,8 +207,8 @@ html, body{
   align-items:center;
   display:flex;
   font-weight:600;
-  background:#000;
-  color:#fff;
+  background:var(--label-bg);
+  color:var(--label-fg);
   font-size:12px;
   line-height:1;
   white-space:nowrap;
@@ -198,12 +229,12 @@ html, body{
 
 /* Wochentage (Headerzeile): schwarz mit weißer Schrift */
 .year-header .header-cell{
-  background:#000;
-  color:#fff;
+  background:var(--weekday-bg);
+  color:var(--weekday-fg);
 }
 
 .year-header .header-cell.weekend-col{
-  background:#000;
+  background:var(--weekday-weekend-bg);
 }
 
 
@@ -223,13 +254,13 @@ html, body{
   position: relative; /* für Notiz-Preview */
 }
 
-/* Sa/So-Spalten */
-.weekend-col{
+/* Sa/So-Spalten (nur Tageszellen) */
+.day-cell.weekend-col{
   background: var(--weekend);
 }
 
 .day-cell.empty{
-  background:#000;
+  background:var(--empty-bg);
   color: transparent;
 }
 

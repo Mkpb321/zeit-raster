@@ -6,6 +6,34 @@
   const CAL = window.KalenderApp.CALENDAR;
   const UI = window.KalenderApp.UI;
 
+  // ---- Theme (dark/light) ----
+  const THEME = {
+    DARK: "dark",
+    LIGHT: "light",
+  };
+
+  const getStoredTheme = () => {
+    try {
+      const raw = localStorage.getItem(CONFIG.STORAGE_THEME);
+      return raw === THEME.LIGHT ? THEME.LIGHT : THEME.DARK;
+    } catch {
+      return THEME.DARK;
+    }
+  };
+
+  const setStoredTheme = (theme) => {
+    try {
+      localStorage.setItem(CONFIG.STORAGE_THEME, theme);
+    } catch {
+      // ignore
+    }
+  };
+
+  const applyTheme = (theme) => {
+    const t = theme === THEME.LIGHT ? THEME.LIGHT : THEME.DARK;
+    document.documentElement.setAttribute("data-theme", t);
+  };
+
   const isHexColor = (v) => typeof v === "string" && /^#[0-9a-fA-F]{6}$/.test(v.trim());
   const normHex = (v) => (isHexColor(v) ? v.trim().toLowerCase() : null);
 
@@ -104,6 +132,9 @@
 
     // Info
     infoBtn: document.getElementById("infoBtn"),
+
+    // Theme
+    themeBtn: document.getElementById("themeBtn"),
     infoModal: document.getElementById("infoModal"),
     infoCloseBtn: document.getElementById("infoClose"),
 
@@ -157,6 +188,24 @@
     dragStartKey: null,
     dragLastKey: null,
   };
+
+  const syncThemeButton = () => {
+    if (!state.themeBtn) return;
+    const isDark = state.theme === THEME.DARK;
+    state.themeBtn.textContent = isDark ? "Dunkel" : "Hell";
+    state.themeBtn.setAttribute("aria-pressed", isDark ? "true" : "false");
+  };
+
+  const setTheme = (theme, { persist } = { persist: true }) => {
+    const t = theme === THEME.LIGHT ? THEME.LIGHT : THEME.DARK;
+    state.theme = t;
+    applyTheme(t);
+    if (persist) setStoredTheme(t);
+    syncThemeButton();
+  };
+
+  // Initial theme (default: dunkel)
+  setTheme(getStoredTheme(), { persist: false });
 
   // Farben laden (inkl. Migration)
   state.colorMap = loadColorMap(state.customMarkers);
@@ -391,6 +440,13 @@
   // ------- Wire UI -------
   const wireUI = () => {
     UI.renderSwatches(state.swatchesEl, state);
+
+    // Theme
+    if (state.themeBtn) {
+      state.themeBtn.addEventListener("click", () => {
+        setTheme(state.theme === THEME.DARK ? THEME.LIGHT : THEME.DARK, { persist: true });
+      });
+    }
 
     // Stift: zweiter Klick deaktiviert; beim Aktivieren darf keine Farbe aktiv sein
     state.penToolBtn.addEventListener("click", () => {

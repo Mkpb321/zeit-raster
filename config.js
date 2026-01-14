@@ -24,5 +24,8 @@
     STORAGE_MARKERS_LEGACY: "calendarMarkersV3",   // legacy: date -> "yellow"/...
     STORAGE_NOTES: "calendarNotesV2",
     STORAGE_CUSTOM_MARKERS: "calendarCustomMarkersV1", // Palette: [{id,color,label}]
+
+    // UI
+    STORAGE_THEME: "calendarThemeV1", // "dark" | "light"
   };
 })();
