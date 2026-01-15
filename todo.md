@@ -12,4 +12,4 @@ be export kann man den namen setzen
 
 die jahre sollen nichtmehr getrennt sein
 
-mach felder, die garkeine tage sind (und daher auch keine zahl drinn haben) die die so an den rändern der zeilen sind. Scharz ausgefüllt für die übersichtlichkeit
+hell dunkel knopf switcht nur das alignement der monate und jahre

@@ -313,13 +313,6 @@
     URL.revokeObjectURL(a.href);
   };
 
-  const colorFromLegacyId = (id) => {
-    if (typeof id !== "string") return null;
-    const built = CONFIG.MARKERS.find(m => m.id === id);
-    if (built && isHexColor(built.color)) return normHex(built.color);
-    return null;
-  };
-
   const validateCustomMarkers = (value) => {
     if (!Array.isArray(value)) return [];
     const out = [];
@@ -353,36 +346,24 @@
       return;
     }
 
-    // Unterstützt:
-    // - Neu: { colors, notes, customMarkers }
-    // - Alt: { markers, notes, customMarkers } (markers enthält IDs)
-    const colorsLike = (obj && obj.colors) || (obj && obj.markers);
+    // Erwartet: { colors, notes, customMarkers }
+    const colors = obj && obj.colors;
     const notes = obj && obj.notes;
 
-    if (!colorsLike || typeof colorsLike !== "object" || !notes || typeof notes !== "object") {
+    if (!colors || typeof colors !== "object" || !notes || typeof notes !== "object") {
       alert("Import fehlgeschlagen: Datei-Format ungültig (colors/notes fehlen).");
       return;
     }
 
     const nextCustom = validateCustomMarkers(obj.customMarkers);
 
-    const customIdToColor = new Map(nextCustom.map(m => [m.id, normHex(m.color)]));
-
     const nextColors = {};
-    for (const [k, v] of Object.entries(colorsLike)) {
+    for (const [k, v] of Object.entries(colors)) {
       if (typeof k !== "string") continue;
       if (!/^\d{4}-\d{2}-\d{2}$/.test(k)) continue;
 
       if (typeof v !== "string") continue;
-
-      // v kann sein:
-      // - "#rrggbb" (neu)
-      // - built-in ID ("yellow") (alt)
-      // - custom ID ("c_...") (alt, wenn customMarkers im Export enthalten waren)
-      let c = normHex(v);
-      if (!c) c = colorFromLegacyId(v);
-      if (!c && customIdToColor.has(v)) c = customIdToColor.get(v) || null;
-
+      const c = normHex(v);
       if (!c) continue;
       nextColors[k] = c;
     }

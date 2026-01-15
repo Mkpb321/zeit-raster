@@ -2,15 +2,16 @@
   --line:#000;
   --bg:#fff;
   --weekend:#f0f0f0;
-  /* Theme (default: dunkel wie aktuell)
-     "Chrome" = Hintergrund/Label/Leerfelder/Wochentagsleiste (nicht die Tageszellen). */
-  --chrome-bg:#000;
-  --chrome-fg:#fff;
-  --page-bg: var(--chrome-bg);
+  /* Fixe UI-Farben (ohne Toggle/Regler)
+     - Außen (hinter den Tabellen): schwarz
+     - UI-/Chrome-Flächen: ~55% Grau
+     - Beschriftungen: weiß */
+  --page-bg:#000;
+  --chrome-bg: rgb(55% 55% 55%);
   --label-bg: var(--chrome-bg);
-  --label-fg: var(--chrome-fg);
+  --label-fg:#fff;
   --weekday-bg: var(--chrome-bg);
-  --weekday-fg: var(--chrome-fg);
+  --weekday-fg:#fff;
   --weekday-weekend-bg: var(--chrome-bg);
   --empty-bg: var(--chrome-bg);
 
@@ -25,17 +26,6 @@
   --label-w: 72px;     /* Monat/Jahr-Spalte */
   --cols: 37;          /* lead (0..6) + max 31 Tage => 37 */
   --cell-h: 28px;      /* Zellenhöhe */
-}
-
-:root[data-theme="light"]{
-  /* Theme: hell (ursprünglicher Look) */
-  --chrome-bg:#fff;
-  --chrome-fg:#000;
-}
-
-:root[data-theme="light"] .label-cell{
-  text-align:left;
-  justify-content:flex-start;
 }
 
 *{ box-sizing:border-box; }
@@ -144,42 +134,9 @@ html, body{
   outline-offset:2px;
 }
 
-.theme-btn{
-  margin-left:auto;
-}
-
-/* Toolbar: Theme-Controls */
-.toggle-control,
-.range-control{
-  display:flex;
-  align-items:center;
-  gap:6px;
-  height:22px;
-  border:1px solid var(--line);
-  padding:0 8px;
-  background:var(--bg);
-  font-size:12px;
-}
-
-.toggle-control input{
-  margin:0;
-}
-
-.range-control input[type="range"]{
-  width: 110px;
-}
-
-.range-label{
-  font-weight:600;
-}
-
-.range-value{
-  min-width: 36px;
-  text-align:right;
-  font-variant-numeric: tabular-nums;
-}
 
 .clear-all{
+  margin-left:auto;
   border:1px solid var(--line);
   background:var(--bg);
   padding:4px 8px;
@@ -192,10 +149,6 @@ html, body{
   transform: translateY(1px);
 }
 
-/* Theme-Toggle rechts ausrichten */
-.theme-btn{
-  margin-left:auto;
-}
 
 /* Nur vertikal scrollen */
 .scroller{
@@ -231,8 +184,8 @@ html, body{
   border-left:1px solid var(--line);
   border-top:1px solid var(--line);
   padding:6px 8px;
-  text-align:right;
-  justify-content:flex-end;
+  text-align:left;
+  justify-content:flex-start;
   align-items:center;
   display:flex;
   font-weight:600;

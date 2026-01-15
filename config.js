@@ -19,17 +19,11 @@
     ],
 
     // Ab hier: Speicherung
-    // Wichtig: Für eingefärbte Tage speichern wir den HEX-Farbcode (z.B. "#ffd0d0"), nicht mehr eine Marker-ID.
+    // Für eingefärbte Tage speichern wir den HEX-Farbcode (z.B. "#ffd0d0").
     STORAGE_MARKERS: "calendarMarkersV4",          // date -> "#rrggbb"
-    STORAGE_MARKERS_LEGACY: "calendarMarkersV3",   // legacy: date -> "yellow"/...
     STORAGE_NOTES: "calendarNotesV2",
     STORAGE_CUSTOM_MARKERS: "calendarCustomMarkersV1", // Palette: [{id,color,label}]
 
     // UI
-    STORAGE_THEME: "calendarThemeV1", // "dark" | "light"
-
-    // UI-Feintuning (Theme-Overrides)
-    STORAGE_CHROME_BG: "calendarChromeBgV1",  // "0".."100" (Prozent, 0=schwarz, 100=weiß)
-    STORAGE_CHROME_FG: "calendarChromeFgV1",  // "white" | "black"
   };
 })();

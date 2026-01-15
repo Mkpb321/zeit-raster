@@ -6,111 +6,6 @@
   const CAL = window.KalenderApp.CALENDAR;
   const UI = window.KalenderApp.UI;
 
-  // ---- Theme (dark/light) ----
-  const THEME = {
-    DARK: "dark",
-    LIGHT: "light",
-  };
-
-  const getStoredTheme = () => {
-    try {
-      const raw = localStorage.getItem(CONFIG.STORAGE_THEME);
-      return raw === THEME.LIGHT ? THEME.LIGHT : THEME.DARK;
-    } catch {
-      return THEME.DARK;
-    }
-  };
-
-  const setStoredTheme = (theme) => {
-    try {
-      localStorage.setItem(CONFIG.STORAGE_THEME, theme);
-    } catch {
-      // ignore
-    }
-  };
-
-  const applyTheme = (theme) => {
-    const t = theme === THEME.LIGHT ? THEME.LIGHT : THEME.DARK;
-    document.documentElement.setAttribute("data-theme", t);
-  };
-
-  // ---- Chrome (Hintergrund + Header/Label-Textfarbe) ----
-  const clamp01 = (n, min, max) => Math.min(max, Math.max(min, n));
-
-  const percentToGray = (percent) => {
-    const p = clamp01(Number(percent), 0, 100);
-    const v = Math.round(255 * (p / 100));
-    return `rgb(${v} ${v} ${v})`;
-  };
-
-  const getDefaultChromeBgPercent = (theme) => (theme === THEME.LIGHT ? 100 : 0);
-  const getDefaultChromeTextIsWhite = (theme) => (theme === THEME.DARK);
-
-  const getStoredChromeBgPercent = () => {
-    try {
-      const raw = localStorage.getItem(CONFIG.STORAGE_CHROME_BG);
-      if (raw === null || raw === undefined || raw === "") return null;
-      const n = parseInt(raw, 10);
-      if (!Number.isFinite(n)) return null;
-      return clamp01(n, 0, 100);
-    } catch {
-      return null;
-    }
-  };
-
-  const setStoredChromeBgPercent = (percentOrNull) => {
-    try {
-      if (percentOrNull === null) {
-        localStorage.removeItem(CONFIG.STORAGE_CHROME_BG);
-        return;
-      }
-      localStorage.setItem(CONFIG.STORAGE_CHROME_BG, String(clamp01(percentOrNull, 0, 100)));
-    } catch {
-      // ignore
-    }
-  };
-
-  const getStoredChromeTextIsWhite = () => {
-    try {
-      const raw = localStorage.getItem(CONFIG.STORAGE_CHROME_FG);
-      if (raw === null || raw === undefined || raw === "") return null;
-      if (raw === "white") return true;
-      if (raw === "black") return false;
-      return null;
-    } catch {
-      return null;
-    }
-  };
-
-  const setStoredChromeTextIsWhite = (isWhiteOrNull) => {
-    try {
-      if (isWhiteOrNull === null) {
-        localStorage.removeItem(CONFIG.STORAGE_CHROME_FG);
-        return;
-      }
-      localStorage.setItem(CONFIG.STORAGE_CHROME_FG, isWhiteOrNull ? "white" : "black");
-    } catch {
-      // ignore
-    }
-  };
-
-  const applyChromeBg = (percentOrNull) => {
-    if (percentOrNull === null) {
-      document.documentElement.style.removeProperty("--chrome-bg");
-      return;
-    }
-    const p = clamp01(percentOrNull, 0, 100);
-    document.documentElement.style.setProperty("--chrome-bg", percentToGray(p));
-  };
-
-  const applyChromeText = (isWhiteOrNull) => {
-    if (isWhiteOrNull === null) {
-      document.documentElement.style.removeProperty("--chrome-fg");
-      return;
-    }
-    document.documentElement.style.setProperty("--chrome-fg", isWhiteOrNull ? "#fff" : "#000");
-  };
-
   const isHexColor = (v) => typeof v === "string" && /^#[0-9a-fA-F]{6}$/.test(v.trim());
   const normHex = (v) => (isHexColor(v) ? v.trim().toLowerCase() : null);
 
@@ -139,58 +34,23 @@
     return out;
   };
 
-  const builtInIdToColor = (id) => {
-    if (typeof id !== "string") return null;
-    const def = CONFIG.MARKERS.find(m => m.id === id);
-    return def ? normHex(def.color) : null;
-  };
-
-  const loadColorMap = (customMarkers) => {
-    // Neu (V4): date -> "#rrggbb"
+  const loadColorMap = () => {
     const current = S.safeLoad(CONFIG.STORAGE_MARKERS, {});
-    const hasAny = current && typeof current === "object" && Object.keys(current).length > 0;
+    if (!current || typeof current !== "object") return {};
 
-    // Wenn bereits V4 vorhanden, nur validieren
-    if (hasAny) {
-      const out = {};
-      for (const [k, v] of Object.entries(current)) {
-        if (!/^\d{4}-\d{2}-\d{2}$/.test(k)) continue;
-        const c = normHex(v);
-        if (!c) continue;
-        out[k] = c;
-      }
-      // Optional: zurückspeichern, falls bereinigt
-      S.safeSave(CONFIG.STORAGE_MARKERS, out);
-      return out;
-    }
-
-    // Legacy (V3): date -> markerId (built-in) oder customId
-    const legacy = S.safeLoad(CONFIG.STORAGE_MARKERS_LEGACY, {});
-    if (!legacy || typeof legacy !== "object" || Object.keys(legacy).length === 0) {
-      return {};
-    }
-
-    const customIdToColor = new Map(
-      (Array.isArray(customMarkers) ? customMarkers : []).map(m => [m.id, normHex(m.color)])
-    );
-
-    const migrated = {};
-    for (const [k, v] of Object.entries(legacy)) {
+    const out = {};
+    for (const [k, v] of Object.entries(current)) {
       if (!/^\d{4}-\d{2}-\d{2}$/.test(k)) continue;
-      if (typeof v !== "string") continue;
-
-      let c = normHex(v);
-      if (!c) c = builtInIdToColor(v);
-      if (!c && customIdToColor.has(v)) c = customIdToColor.get(v) || null;
+      const c = normHex(v);
       if (!c) continue;
-
-      migrated[k] = c;
+      out[k] = c;
     }
 
-    // In neues Format speichern (Farbcodes)
-    S.safeSave(CONFIG.STORAGE_MARKERS, migrated);
-    return migrated;
+    // Optional: zurückspeichern, falls bereinigt
+    S.safeSave(CONFIG.STORAGE_MARKERS, out);
+    return out;
   };
+
 
   // DOM Refs / App-State
   const state = {
@@ -209,12 +69,6 @@
 
     // Info
     infoBtn: document.getElementById("infoBtn"),
-
-    // Theme
-    themeBtn: document.getElementById("themeBtn"),
-    chromeTextToggle: document.getElementById("chromeTextToggle"),
-    chromeBgRange: document.getElementById("chromeBgRange"),
-    chromeBgLabel: document.getElementById("chromeBgLabel"),
     infoModal: document.getElementById("infoModal"),
     infoCloseBtn: document.getElementById("infoClose"),
 
@@ -240,10 +94,6 @@
     // State
     mode: "none",           // "none" | "color" | "pen" | "erase"
     selectedColor: null,    // "#rrggbb" oder null
-
-    // Theme-Overrides
-    chromeBgPercent: null,      // null = auto, sonst 0..100
-    chromeTextIsWhite: null,    // null = auto, sonst boolean
 
     customMarkers: loadCustomMarkers(),
     customColorPickerValue: "#ffd0d0",
@@ -271,68 +121,10 @@
     dragColor: null,
     dragStartKey: null,
     dragLastKey: null,
-
-    // Chrome Overrides
-    chromeBgPercent: null,        // null => Auto (Theme), sonst 0..100
-    chromeTextIsWhite: null,      // null => Auto (Theme), sonst boolean
   };
-
-  const syncThemeButton = () => {
-    if (!state.themeBtn) return;
-    const isDark = state.theme === THEME.DARK;
-    state.themeBtn.textContent = isDark ? "Dunkel" : "Hell";
-    state.themeBtn.setAttribute("aria-pressed", isDark ? "true" : "false");
-  };
-
-  const getChromeBgUiValue = () => {
-    return state.chromeBgPercent === null
-      ? getDefaultChromeBgPercent(state.theme)
-      : clamp01(state.chromeBgPercent, 0, 100);
-  };
-
-  const getChromeTextUiValue = () => {
-    return state.chromeTextIsWhite === null
-      ? getDefaultChromeTextIsWhite(state.theme)
-      : Boolean(state.chromeTextIsWhite);
-  };
-
-  const syncChromeControls = () => {
-    if (state.chromeTextToggle) {
-      const isWhite = getChromeTextUiValue();
-      state.chromeTextToggle.checked = isWhite;
-      state.chromeTextToggle.setAttribute("aria-checked", isWhite ? "true" : "false");
-    }
-
-    if (state.chromeBgRange) {
-      const p = getChromeBgUiValue();
-      state.chromeBgRange.value = String(p);
-      if (state.chromeBgLabel) state.chromeBgLabel.textContent = `${p}%`;
-    }
-  };
-
-  const setTheme = (theme, { persist } = { persist: true }) => {
-    const t = theme === THEME.LIGHT ? THEME.LIGHT : THEME.DARK;
-    state.theme = t;
-    applyTheme(t);
-    if (persist) setStoredTheme(t);
-    syncThemeButton();
-    syncChromeControls();
-  };
-
-  // Initial theme (default: dunkel)
-  setTheme(getStoredTheme(), { persist: false });
-
-  // Chrome-Overrides laden (falls gesetzt). Wenn nichts gespeichert ist, bleibt es "auto"
-  // und folgt dem Theme.
-  state.chromeBgPercent = getStoredChromeBgPercent();
-  state.chromeTextIsWhite = getStoredChromeTextIsWhite();
-
-  applyChromeBg(state.chromeBgPercent);
-  applyChromeText(state.chromeTextIsWhite);
-  syncChromeControls();
 
   // Farben laden (inkl. Migration)
-  state.colorMap = loadColorMap(state.customMarkers);
+  state.colorMap = loadColorMap();
 
   // CSS cols setzen
   document.documentElement.style.setProperty("--cols", String(CONFIG.COLS));
@@ -564,35 +356,6 @@
   // ------- Wire UI -------
   const wireUI = () => {
     UI.renderSwatches(state.swatchesEl, state);
-
-    // Theme
-    if (state.themeBtn) {
-      state.themeBtn.addEventListener("click", () => {
-        setTheme(state.theme === THEME.DARK ? THEME.LIGHT : THEME.DARK, { persist: true });
-      });
-    }
-
-    // Chrome: Header/Label-Textfarbe (Monate/Jahre/Wochentage)
-    if (state.chromeTextToggle) {
-      state.chromeTextToggle.addEventListener("change", () => {
-        const isWhite = Boolean(state.chromeTextToggle.checked);
-        state.chromeTextIsWhite = isWhite;
-        applyChromeText(state.chromeTextIsWhite);
-        setStoredChromeTextIsWhite(state.chromeTextIsWhite);
-        syncChromeControls();
-      });
-    }
-
-    // Chrome: Hintergrund-Regler (0..100%)
-    if (state.chromeBgRange) {
-      state.chromeBgRange.addEventListener("input", () => {
-        const p = clamp01(parseInt(state.chromeBgRange.value, 10), 0, 100);
-        state.chromeBgPercent = p;
-        applyChromeBg(state.chromeBgPercent);
-        setStoredChromeBgPercent(state.chromeBgPercent);
-        syncChromeControls();
-      });
-    }
 
     // Stift: zweiter Klick deaktiviert; beim Aktivieren darf keine Farbe aktiv sein
     state.penToolBtn.addEventListener("click", () => {
