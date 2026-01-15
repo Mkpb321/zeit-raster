@@ -420,3 +420,10 @@ html, body{
   border: 1px solid var(--line);
   padding: 0 4px;
 }
+
+/* Jahreszahl (nur im Kopf des Jahrblocks) größer machen */
+.year-header > .label-cell{
+  font-size: 13px;      /* anpassen */
+  font-weight: 700;     /* optional */
+  line-height: 1.1;
+}
