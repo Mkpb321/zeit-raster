@@ -7,13 +7,13 @@
      - UI-/Chrome-Flächen: ~55% Grau
      - Beschriftungen: weiß */
   --page-bg:#000;
-  --chrome-bg: rgb(55% 55% 55%);
-  --label-bg: var(--chrome-bg);
+  --chrome-bg: rgb(45% 45% 45%);
+  --label-bg: rgb(45% 45% 45%);
   --label-fg:#fff;
-  --weekday-bg: var(--chrome-bg);
+  --weekday-bg: rgb(45% 45% 45%);
   --weekday-fg:#fff;
-  --weekday-weekend-bg: var(--chrome-bg);
-  --empty-bg: var(--chrome-bg);
+  --weekday-weekend-bg: rgb(45% 45% 45%);
+  --empty-bg: rgb(30% 30% 30%);
 
   /* Built-in Markerfarben (werden zusätzlich in config.js geführt) */
   --m-yellow: #fff3b0;
