@@ -55,16 +55,17 @@
 
     html.classList.add("css-rotate-landscape");
 
-    // Body in "Landscape"-Dimensionen festlegen (swap), dann um 90° drehen.
-    // matrix(0,1,-1,0,0,vh) entspricht rotate(90deg) + translateY(vh)
-    // und bringt die Box zurück ins sichtbare Viewport-Rechteck.
+    // Body in "Landscape"-Dimensionen festlegen (swap), dann um 90° im Uhrzeigersinn drehen.
+    // Wichtig: Die Translation muss so gewählt werden, dass der gesamte Inhalt
+    // im sichtbaren Viewport liegt (sonst "schwarz"/leer).
     body.style.position = "fixed";
     body.style.top = "0";
     body.style.left = "0";
     body.style.width = `${vh}px`;
     body.style.height = `${vw}px`;
     body.style.transformOrigin = "top left";
-    body.style.transform = `matrix(0,1,-1,0,0,${vh})`;
+    // matrix(0,-1,1,0,0,vh) entspricht rotate(90deg) (clockwise) + translateY(vh)
+    body.style.transform = `matrix(0,-1,1,0,0,${vh})`;
     body.style.overflow = "hidden";
   };
 
