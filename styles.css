@@ -39,23 +39,34 @@ html, body{
 }
 
 .app{
-  height:100%;
+  height:100vh;
   width:100%;
   display:flex;
   flex-direction:column;
   background:var(--page-bg);
 }
 
+@supports (height: 100dvh){
+  .app{ height: 100dvh; }
+}
+
+
 /* Toolbar minimal halten */
 .toolbar{
   border-bottom:1px solid var(--line);
-  padding:6px 8px;
+  padding-top: calc(6px + env(safe-area-inset-top));
+  padding-right: calc(8px + env(safe-area-inset-right));
+  padding-bottom: 6px;
+  padding-left: calc(8px + env(safe-area-inset-left));
   background:var(--bg);
   display:flex;
   align-items:center;
   gap:10px;
   flex-wrap: wrap;
+  position: relative;
+  z-index: 100;
 }
+
 
 
 .toolbar-left{
@@ -179,7 +190,9 @@ html, body{
   overflow-y:auto;
   overflow-x:hidden;
   background:var(--page-bg);
+  -webkit-overflow-scrolling: touch;
 }
+
 
 .calendar{
   width:100%;
@@ -521,3 +534,42 @@ html, body{
   display: none !important;
 }
 
+
+
+/* iOS Touch-Optimierungen */
+button, .tool-btn, .clear-all, .swatch{ touch-action: manipulation; }
+button{ -webkit-tap-highlight-color: transparent; }
+
+/* -------- Orientation Gate (Smartphones: Landscape only) -------- */
+.rotate-view{
+  position: fixed;
+  inset: 0;
+  background: var(--page-bg);
+  display:flex;
+  z-index: 20000;
+  align-items:center;
+  justify-content:center;
+  padding: 16px;
+}
+
+.rotate-view[hidden]{
+  display:none !important;
+}
+
+.rotate-card{
+  width: min(420px, 100%);
+  border: 1px solid var(--line);
+  background: var(--bg);
+  padding: 14px;
+}
+
+.rotate-title{
+  font-weight: 700;
+  font-size: 14px;
+  margin-bottom: 8px;
+}
+
+.rotate-text{
+  font-size: 12px;
+  line-height: 1.35;
+}

@@ -350,7 +350,6 @@
         state.dragStartKey = dateKey;
         state.dragLastKey = dateKey;
     
-        try { state.calendarEl.setPointerCapture(ev.pointerId); } catch {}
         return;
       }
     
@@ -366,7 +365,6 @@
       state.dragStartKey = dateKey;
       state.dragLastKey = dateKey;
     
-      try { state.calendarEl.setPointerCapture(ev.pointerId); } catch {}
     };
     
     const onPointerMove = (ev) => {
@@ -374,7 +372,7 @@
       if (state.dragPointerId !== ev.pointerId) return;
     
       if (state.dragMode === "pen") return;
-      if ((ev.buttons & 1) !== 1) return;
+      if (ev.pointerType !== "touch" && (ev.buttons & 1) !== 1) return;
     
       const cell = getDayCellFromPoint(ev.clientX, ev.clientY);
       if (!cell) return;
@@ -418,7 +416,6 @@
       state.dragStartKey = null;
       state.dragLastKey = null;
     
-      try { state.calendarEl.releasePointerCapture(ev.pointerId); } catch {}
     };
     
     // ------- Info Modal -------
@@ -532,12 +529,14 @@
       state.infoCloseBtn.addEventListener("click", closeInfoModal);
     
       // Pointer-based drag interaction
-      state.calendarEl.addEventListener("pointerdown", onPointerDown);
-      state.calendarEl.addEventListener("pointermove", onPointerMove);
-      state.calendarEl.addEventListener("pointerup", onPointerUpOrCancel);
-      state.calendarEl.addEventListener("pointercancel", onPointerUpOrCancel);
-    
-      // Beim Laden: bewusst kein aktiver Modus / keine Farbe aktiv
+      state.calendarEl.addEventListener("pointerdown", onPointerDown, { passive: false });
+window.addEventListener("pointermove", onPointerMove, { passive: true });
+window.addEventListener("pointerup", onPointerUpOrCancel, { passive: true });
+window.addEventListener("pointercancel", onPointerUpOrCancel, { passive: true });
+// iOS/Safari: Safety reset, falls Pointer-Cancel/Up nicht sauber geliefert wird
+window.addEventListener("blur", () => { if (state.dragActive) { state.dragActive = false; state.dragStarted = false; state.dragPointerId = null; state.dragMode = null; state.dragColor = null; state.dragStartKey = null; state.dragLastKey = null; } }, { passive: true });
+document.addEventListener("visibilitychange", () => { if (document.hidden && state.dragActive) { state.dragActive = false; state.dragStarted = false; state.dragPointerId = null; state.dragMode = null; state.dragColor = null; state.dragStartKey = null; state.dragLastKey = null; } }, { passive: true });
+// Beim Laden: bewusst kein aktiver Modus / keine Farbe aktiv
       UI.clearColorSelection(state);
       UI.setMode(state, "none");
     };
