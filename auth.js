@@ -34,6 +34,15 @@
     return firebase.auth();
   };
 
+  const initFirestore = () => {
+    if (!window.firebase || !firebase.firestore || typeof firebase.firestore !== "function") return null;
+    try {
+      return firebase.firestore();
+    } catch {
+      return null;
+    }
+  };
+
   const boot = () => {
     const loginView = document.getElementById("loginView");
     const appRoot = document.getElementById("appRoot");
@@ -70,6 +79,7 @@
     if (logoutBtn) logoutBtn.hidden = true;
 
     const auth = initAuth();
+    const db = initFirestore();
     if (!auth) {
       setHidden(loginView, false);
       setHidden(appRoot, true);
@@ -78,8 +88,21 @@
       return;
     }
 
+    if (!db) {
+      // Ohne Firestore ist die App nicht sinnvoll nutzbar (Persistenz für Farben/Notizen)
+      setHidden(loginView, false);
+      setHidden(appRoot, true);
+      if (logoutBtn) logoutBtn.hidden = true;
+      showError("Firestore SDK konnte nicht geladen werden. Bitte Internetverbindung prüfen.");
+      return;
+    }
+
     auth.onAuthStateChanged((user) => {
       if (user) {
+        // Auth-Kontext für die restliche App bereitstellen
+        window.KalenderApp = window.KalenderApp || {};
+        window.KalenderApp.AUTH_CTX = { auth, db, uid: user.uid, user };
+
         setHidden(loginView, true);
         setHidden(appRoot, false);
         if (logoutBtn) logoutBtn.hidden = false;
@@ -91,6 +114,10 @@
         showError(null);
         setBusy(false);
       } else {
+        // Auth-Kontext entfernen
+        window.KalenderApp = window.KalenderApp || {};
+        window.KalenderApp.AUTH_CTX = null;
+
         setHidden(appRoot, true);
         setHidden(loginView, false);
         if (logoutBtn) logoutBtn.hidden = true;

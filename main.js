@@ -17,6 +17,7 @@
     const A = window.KalenderApp.APPLY;
     const CAL = window.KalenderApp.CALENDAR;
     const UI = window.KalenderApp.UI;
+    const CLOUD = window.KalenderApp.CLOUD;
     
     const isHexColor = (v) => typeof v === "string" && /^#[0-9a-fA-F]{6}$/.test(v.trim());
     const normHex = (v) => (isHexColor(v) ? v.trim().toLowerCase() : null);
@@ -46,10 +47,10 @@
       return out;
     };
     
-    const loadColorMap = () => {
+    // Legacy-Daten (früher: localStorage) nur noch als Fallback/Migration.
+    const loadLegacyLocalColors = () => {
       const current = S.safeLoad(CONFIG.STORAGE_MARKERS, {});
       if (!current || typeof current !== "object") return {};
-    
       const out = {};
       for (const [k, v] of Object.entries(current)) {
         if (!/^\d{4}-\d{2}-\d{2}$/.test(k)) continue;
@@ -57,9 +58,19 @@
         if (!c) continue;
         out[k] = c;
       }
-    
-      // Optional: zurückspeichern, falls bereinigt
-      S.safeSave(CONFIG.STORAGE_MARKERS, out);
+      return out;
+    };
+
+    const loadLegacyLocalNotes = () => {
+      const current = S.safeLoad(CONFIG.STORAGE_NOTES, {});
+      if (!current || typeof current !== "object") return {};
+      const out = {};
+      for (const [k, v] of Object.entries(current)) {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(k)) continue;
+        if (typeof v !== "string") continue;
+        if (v.trim().length === 0) continue;
+        out[k] = v;
+      }
       return out;
     };
     
@@ -115,8 +126,8 @@
     
       clearStepConfirm: false,
     
-      colorMap: {},                   // date -> "#rrggbb"
-      noteMap: S.safeLoad(CONFIG.STORAGE_NOTES, {}),
+      colorMap: {},                   // date -> "#rrggbb" (Quelle: Firestore)
+      noteMap: {},                    // date -> string (Quelle: Firestore)
     
       minYear: null,
       maxYear: null,
@@ -135,8 +146,104 @@
       dragLastKey: null,
     };
     
-    // Farben laden (inkl. Migration)
-    state.colorMap = loadColorMap();
+    // -------- Firestore Sync --------
+    const cloud = {
+      enabled: !!(CLOUD && typeof CLOUD.isReady === "function" && CLOUD.isReady()),
+      dirtyYears: new Set(),
+      flushTimer: null,
+      flushing: false,
+      needsFlush: false,
+      lastErrorShown: false,
+      markDirtyKey: (dateKey) => {
+        if (!cloud.enabled) return;
+        const y = (typeof CLOUD.yearFromKey === "function") ? CLOUD.yearFromKey(dateKey) : null;
+        if (!y) return;
+        cloud.dirtyYears.add(y);
+        cloud.scheduleFlush();
+      },
+      scheduleFlush: () => {
+        if (!cloud.enabled) return;
+        if (cloud.flushTimer) clearTimeout(cloud.flushTimer);
+        cloud.flushTimer = setTimeout(() => cloud.flush(), 800);
+      },
+      flush: async () => {
+        if (!cloud.enabled) return;
+        if (cloud.flushing) {
+          cloud.needsFlush = true;
+          return;
+        }
+
+        cloud.flushing = true;
+        const years = Array.from(cloud.dirtyYears);
+        cloud.dirtyYears.clear();
+
+        try {
+          for (const y of years) {
+            await CLOUD.saveYear(y, state.colorMap, state.noteMap);
+          }
+        } catch (e) {
+          // Fehler nicht spammen
+          if (!cloud.lastErrorShown) {
+            cloud.lastErrorShown = true;
+            try { console.error(e); } catch {}
+            alert("Synchronisation fehlgeschlagen (Firestore). Änderungen könnten nicht gespeichert worden sein.");
+          }
+        } finally {
+          cloud.flushing = false;
+          if (cloud.needsFlush) {
+            cloud.needsFlush = false;
+            cloud.scheduleFlush();
+          }
+        }
+      },
+      replaceAll: async () => {
+        if (!cloud.enabled) return;
+        try {
+          await CLOUD.replaceAll(state.colorMap, state.noteMap);
+        } catch (e) {
+          if (!cloud.lastErrorShown) {
+            cloud.lastErrorShown = true;
+            try { console.error(e); } catch {}
+            alert("Synchronisation fehlgeschlagen (Firestore). Änderungen könnten nicht gespeichert worden sein.");
+          }
+        }
+      },
+      loadInitial: async () => {
+        if (!cloud.enabled) return;
+        try {
+          const loaded = await CLOUD.loadAll();
+          const loadedColors = loaded && loaded.colors && typeof loaded.colors === "object" ? loaded.colors : {};
+          const loadedNotes = loaded && loaded.notes && typeof loaded.notes === "object" ? loaded.notes : {};
+
+          const hasRemote = Object.keys(loadedColors).length > 0 || Object.keys(loadedNotes).length > 0;
+
+          if (hasRemote) {
+            state.colorMap = loadedColors;
+            state.noteMap = loadedNotes;
+          } else {
+            // optionaler Fallback: alte localStorage-Daten hochladen (Migration)
+            const legacyColors = loadLegacyLocalColors();
+            const legacyNotes = loadLegacyLocalNotes();
+            const hasLegacy = Object.keys(legacyColors).length > 0 || Object.keys(legacyNotes).length > 0;
+            if (hasLegacy) {
+              state.colorMap = legacyColors;
+              state.noteMap = legacyNotes;
+              await CLOUD.replaceAll(state.colorMap, state.noteMap);
+            }
+          }
+
+          A.applyAllFromMapsToRenderedCells(state.calendarEl, state.colorMap, state.noteMap);
+        } catch (e) {
+          if (!cloud.lastErrorShown) {
+            cloud.lastErrorShown = true;
+            try { console.error(e); } catch {}
+            alert("Laden fehlgeschlagen (Firestore). Die App startet ohne gespeicherte Daten.");
+          }
+        }
+      }
+    };
+
+    state.cloud = cloud;
     
     // CSS cols setzen
     document.documentElement.style.setProperty("--cols", String(CONFIG.COLS));
@@ -165,18 +272,16 @@
       const c = normHex(hexColor);
       if (!c) return;
       state.colorMap[key] = c;
+      state.cloud && state.cloud.markDirtyKey && state.cloud.markDirtyKey(key);
       const cell = state.calendarEl.querySelector(`.day-cell[data-date="${key}"]`);
       if (cell) A.applyMarkerToCell(cell, c);
     };
     
     const eraseColorOnKey = (key) => {
       if (state.colorMap[key] !== undefined) delete state.colorMap[key];
+      state.cloud && state.cloud.markDirtyKey && state.cloud.markDirtyKey(key);
       const cell = state.calendarEl.querySelector(`.day-cell[data-date="${key}"]`);
       if (cell) A.applyMarkerToCell(cell, null);
-    };
-    
-    const saveColors = () => {
-      S.safeSave(CONFIG.STORAGE_MARKERS, state.colorMap);
     };
     
     // Während Drag: Lücken füllen (Range zwischen lastKey und newKey)
@@ -207,7 +312,6 @@
     
       if (state.mode === "erase") {
         eraseColorOnKey(dateKey);
-        saveColors();
         return;
       }
     
@@ -222,7 +326,6 @@
       } else {
         applyColorOnKey(dateKey, selected);
       }
-      saveColors();
     };
     
     // ------- Pointer Drag Painting / Erasing -------
@@ -285,7 +388,6 @@
       applyDragRangeStep(state.dragLastKey, key);
     
       state.dragLastKey = key;
-      saveColors();
     };
     
     const onPointerUpOrCancel = (ev) => {
@@ -305,7 +407,6 @@
         // Bei Drag: letzter Schritt (falls Up auf neuem Feld)
         if (state.dragMode !== "pen" && endKey && endKey !== state.dragLastKey) {
           applyDragRangeStep(state.dragLastKey, endKey);
-          saveColors();
         }
       }
     
@@ -452,6 +553,11 @@
       onNeedPrepend: prependYears,
       onNeedAppend: appendYears
     });
+
+    // Daten aus Firestore laden (nachdem erstes Render da ist)
+    if (state.cloud && typeof state.cloud.loadInitial === "function") {
+      state.cloud.loadInitial();
+    }
 
   };
 })();

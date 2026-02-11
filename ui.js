@@ -222,14 +222,14 @@
 
     if (trimmed.length === 0) {
       delete state.noteMap[key];
-      S.safeSave(CONFIG.STORAGE_NOTES, state.noteMap);
+      if (state.cloud && typeof state.cloud.markDirtyKey === "function") state.cloud.markDirtyKey(key);
       A.applyNoteToCell(cell, null);
       UI.closeNoteModal(state);
       return;
     }
 
     state.noteMap[key] = raw;
-    S.safeSave(CONFIG.STORAGE_NOTES, state.noteMap);
+    if (state.cloud && typeof state.cloud.markDirtyKey === "function") state.cloud.markDirtyKey(key);
     A.applyNoteToCell(cell, raw);
     UI.closeNoteModal(state);
   };
@@ -256,26 +256,25 @@
   UI.doClearAction = (state, choice) => {
     if (choice === "colors") {
       state.colorMap = {};
-      S.safeSave(CONFIG.STORAGE_MARKERS, state.colorMap);
       const anyMarked = state.calendarEl.querySelectorAll(".day-cell[data-marker]");
       for (const cell of anyMarked) A.applyMarkerToCell(cell, null);
+      if (state.cloud && typeof state.cloud.replaceAll === "function") state.cloud.replaceAll();
       return;
     }
 
     if (choice === "notes") {
       state.noteMap = {};
-      S.safeSave(CONFIG.STORAGE_NOTES, state.noteMap);
       const anyNotes = state.calendarEl.querySelectorAll(".day-cell.has-note");
       for (const cell of anyNotes) A.applyNoteToCell(cell, null);
+      if (state.cloud && typeof state.cloud.replaceAll === "function") state.cloud.replaceAll();
       return;
     }
 
     // all
     state.colorMap = {};
     state.noteMap = {};
-    S.safeSave(CONFIG.STORAGE_MARKERS, state.colorMap);
-    S.safeSave(CONFIG.STORAGE_NOTES, state.noteMap);
     A.applyAllFromMapsToRenderedCells(state.calendarEl, state.colorMap, state.noteMap);
+    if (state.cloud && typeof state.cloud.replaceAll === "function") state.cloud.replaceAll();
   };
 
   // ---------- Export / Import ----------
@@ -383,8 +382,9 @@
     state.colorMap = nextColors;
     state.noteMap = nextNotes;
 
-    S.safeSave(CONFIG.STORAGE_MARKERS, state.colorMap);
-    S.safeSave(CONFIG.STORAGE_NOTES, state.noteMap);
+    if (state.cloud && typeof state.cloud.replaceAll === "function") {
+      await state.cloud.replaceAll();
+    }
 
     // Import ändert nicht automatisch den aktiven Modus: wir lassen es bewusst auf "none"
     UI.clearColorSelection(state);
