@@ -73,10 +73,12 @@
       if (loginBtn) loginBtn.disabled = b;
     };
 
-    // Initial: alles ausblenden, bis Auth-Status bekannt ist
-    setHidden(loginView, true);
+    // Initial: Login sichtbar lassen (iOS Keychain/Autofill funktioniert sonst oft nicht),
+    // App-Root bleibt bis zur erfolgreichen Anmeldung verborgen.
     setHidden(appRoot, true);
+    setHidden(loginView, false);
     if (logoutBtn) logoutBtn.hidden = true;
+    showError(null);
 
     const auth = initAuth();
     const db = initFirestore();

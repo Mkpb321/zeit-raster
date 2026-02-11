@@ -1,4 +1,6 @@
 :root{
+  /* Verhindert iOS/Safari Dark-Mode Auto-Styling bei Form-Controls (sonst z.B. weißer Text auf weißem Button). */
+  color-scheme: light;
   --line:#000;
   --bg:#fff;
   --weekend:#f0f0f0;
@@ -512,6 +514,10 @@ html.css-rotate-landscape .app{
 .login-input{
   border: 1px solid var(--line);
   background: var(--bg);
+  color: #000;
+  -webkit-text-fill-color: #000;
+  -webkit-appearance: none;
+  appearance: none;
   padding: 8px;
   font-size: 13px;
 }
@@ -527,6 +533,10 @@ html.css-rotate-landscape .app{
 .login-btn{
   border: 1px solid var(--line);
   background: var(--bg);
+  color: #000;
+  -webkit-text-fill-color: #000;
+  -webkit-appearance: none;
+  appearance: none;
   padding: 8px 10px;
   font-size: 12px;
   cursor: pointer;
