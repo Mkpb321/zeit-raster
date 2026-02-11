@@ -46,6 +46,16 @@ html, body{
   background:var(--page-bg);
 }
 
+/*
+  Wenn wir auf Smartphones im Portrait per CSS "Landscape" erzwingen,
+  werden Viewport-Units (vh/dvh) sonst falsch (Portrait-Dimensionen).
+  In diesem Modus muss die App die (rotierte) Body-Box ausfüllen.
+*/
+html.css-rotate-landscape .app{
+  height: 100% !important;
+  width: 100% !important;
+}
+
 @supports (height: 100dvh){
   .app{ height: 100dvh; }
 }
