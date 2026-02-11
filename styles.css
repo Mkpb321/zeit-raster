@@ -57,6 +57,16 @@ html, body{
   flex-wrap: wrap;
 }
 
+
+.toolbar-left{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  flex-wrap: wrap;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
 .toolbar-right{
   margin-left:auto;
   display:flex;
@@ -70,8 +80,9 @@ html, body{
   align-items:center;
   flex-wrap: wrap;
   min-width: 0;
-  flex: 1 1 auto;
+  flex: 0 1 auto;
 }
+
 
 .swatch-wrap{
   position:relative;
