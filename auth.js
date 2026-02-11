@@ -13,8 +13,11 @@
 
   const setHidden = (el, hidden) => {
     if (!el) return;
-    el.hidden = !!hidden;
-    el.setAttribute("aria-hidden", String(!!hidden));
+    const h = !!hidden;
+    el.hidden = h;
+    el.setAttribute("aria-hidden", String(h));
+    // Robust: manche Umgebungen verlassen sich nicht zuverlässig auf das hidden-Default-CSS
+    el.style.display = h ? "none" : "";
   };
 
   const initAuth = () => {
@@ -102,13 +105,13 @@
         ev.preventDefault();
         showError(null);
 
-        const email = String(emailEl?.value || "").trim();
-        const password = String(passEl?.value || "");
-
-        if (!email || !password) {
-          showError("Bitte E-Mail und Passwort eingeben.");
+        if (form && typeof form.checkValidity === "function" && !form.checkValidity()) {
+          try { form.reportValidity(); } catch {}
           return;
         }
+
+        const email = String(emailEl?.value || "").trim();
+        const password = String(passEl?.value || "");
 
         setBusy(true);
 
@@ -116,15 +119,7 @@
           await auth.signInWithEmailAndPassword(email, password);
           // onAuthStateChanged übernimmt die UI
         } catch (e) {
-          const code = e && e.code ? String(e.code) : "";
-          let msg = "Login fehlgeschlagen.";
-
-          if (code.includes("auth/invalid-email")) msg = "E-Mail-Adresse ungültig.";
-          else if (code.includes("auth/user-not-found") || code.includes("auth/wrong-password")) msg = "E-Mail oder Passwort falsch.";
-          else if (code.includes("auth/too-many-requests")) msg = "Zu viele Versuche. Bitte später erneut versuchen.";
-          else if (code.includes("auth/network-request-failed")) msg = "Netzwerkfehler. Bitte Verbindung prüfen.";
-
-          showError(msg);
+          showError("Login fehlgeschlagen.");
           setBusy(false);
           try { passEl && passEl.focus(); } catch {}
         }

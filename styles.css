@@ -68,6 +68,9 @@ html, body{
   display:flex;
   gap:8px;
   align-items:center;
+  flex-wrap: wrap;
+  min-width: 0;
+  flex: 1 1 auto;
 }
 
 .swatch-wrap{
@@ -119,6 +122,7 @@ html, body{
 .tool-btn{
   width:28px;
   height:22px;
+  flex: 0 0 auto;
   border:1px solid var(--line);
   background:var(--bg);
   cursor:pointer;
@@ -143,6 +147,7 @@ html, body{
 
 
 .clear-all{
+  flex: 0 0 auto;
   border:1px solid var(--line);
   background:var(--bg);
   padding:4px 8px;
@@ -440,6 +445,7 @@ html, body{
   inset: 0;
   background: var(--page-bg);
   display:flex;
+  z-index: 10000;
   align-items:center;
   justify-content:center;
   padding: 16px;
@@ -477,9 +483,11 @@ html, body{
 }
 
 .login-error{
-  border: 1px solid var(--line);
-  padding: 8px;
+  border: none;
+  padding: 0;
+  margin-top: 8px;
   font-size: 12px;
+  color: #b00020;
 }
 
 .login-btn{
@@ -496,8 +504,9 @@ html, body{
   cursor: default;
 }
 
-.login-hint{
-  margin-top: 10px;
-  font-size: 12px;
-  opacity: 0.85;
+
+/* Hidden-Attribut zuverlässig auswerten (besonders für Login-Gate) */
+[hidden]{
+  display: none !important;
 }
+
