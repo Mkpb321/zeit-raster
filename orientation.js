@@ -1,6 +1,21 @@
 (() => {
   "use strict";
 
+  // Rotation/Lock soll erst nach erfolgreichem Login greifen.
+  // Im Login-Screen (appRoot hidden) drehen wir NICHT.
+  const isAppVisible = () => {
+    const appRoot = document.getElementById("appRoot");
+    if (!appRoot) return false;
+    if (appRoot.hidden) return false;
+    try {
+      const cs = window.getComputedStyle ? getComputedStyle(appRoot) : null;
+      if (cs && (cs.display === "none" || cs.visibility === "hidden")) return false;
+    } catch {
+      // ignore
+    }
+    return true;
+  };
+
   const isSmartphone = () => {
     const ua = String(navigator.userAgent || "");
     const phoneUA = /iPhone|iPod/.test(ua) || (/Android/.test(ua) && /Mobile/.test(ua));
@@ -10,6 +25,7 @@
   };
 
   const tryLockLandscape = async () => {
+    if (!isAppVisible()) return;
     if (!isSmartphone()) return;
     const o = screen && screen.orientation;
     if (!o || typeof o.lock !== "function") return;
@@ -28,6 +44,20 @@
     const html = document.documentElement;
     const body = document.body;
     if (!body) return;
+
+    // Keine Rotation im Login-Screen.
+    if (!isAppVisible()) {
+      html.classList.remove("css-rotate-landscape");
+      body.style.transform = "";
+      body.style.transformOrigin = "";
+      body.style.width = "";
+      body.style.height = "";
+      body.style.position = "";
+      body.style.top = "";
+      body.style.left = "";
+      body.style.overflow = "";
+      return;
+    }
 
     const phone = isSmartphone();
     const portrait = (window.matchMedia && window.matchMedia("(orientation: portrait)").matches)
@@ -75,14 +105,18 @@
     applyCssRotateLandscape();
 
     // Einige Browser erlauben lock() nur nach User-Geste
-    const onFirstGesture = () => {
+    const onGesture = () => {
       tryLockLandscape();
       applyCssRotateLandscape();
-      window.removeEventListener("click", onFirstGesture, true);
-      window.removeEventListener("touchend", onFirstGesture, true);
     };
-    window.addEventListener("click", onFirstGesture, true);
-    window.addEventListener("touchend", onFirstGesture, true);
+    window.addEventListener("click", onGesture, true);
+    window.addEventListener("touchend", onGesture, true);
+
+    // Auth-State-Wechsel (Login/Logout) triggert Layout-Neuberechnung.
+    window.addEventListener("kalenderapp:authchange", () => {
+      tryLockLandscape();
+      applyCssRotateLandscape();
+    });
 
     // Bei Rotation/Resize nochmal versuchen (debounced via setTimeout)
     const retry = () => setTimeout(() => {

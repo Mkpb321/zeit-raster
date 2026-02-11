@@ -107,6 +107,13 @@
         setHidden(appRoot, false);
         if (logoutBtn) logoutBtn.hidden = false;
 
+        // Für Orientation/Viewport-Logik (z.B. CSS-Rotation) – erst nach Login aktiv.
+        try {
+          window.dispatchEvent(new CustomEvent("kalenderapp:authchange", { detail: { loggedIn: true, uid: user.uid } }));
+        } catch {
+          // ignore
+        }
+
         // App (einmalig) starten
         const K = window.KalenderApp || {};
         if (typeof K.startApp === "function") K.startApp();
@@ -121,6 +128,13 @@
         setHidden(appRoot, true);
         setHidden(loginView, false);
         if (logoutBtn) logoutBtn.hidden = true;
+
+        // Rotation/Lock im Login-Screen deaktivieren.
+        try {
+          window.dispatchEvent(new CustomEvent("kalenderapp:authchange", { detail: { loggedIn: false } }));
+        } catch {
+          // ignore
+        }
         setBusy(false);
         showError(null);
         if (emailEl) emailEl.focus();
