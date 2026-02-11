@@ -8,7 +8,25 @@
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <main class="app">
+  <div id="loginView" class="login-view" hidden aria-hidden="true">
+    <div class="login-card" role="dialog" aria-modal="true" aria-labelledby="loginTitle">
+      <div id="loginTitle" class="login-title">Login</div>
+      <form id="loginForm" class="login-form" autocomplete="on">
+        <label class="login-label" for="loginEmail">E-Mail</label>
+        <input id="loginEmail" class="login-input" type="email" autocomplete="username" required />
+
+        <label class="login-label" for="loginPassword">Passwort</label>
+        <input id="loginPassword" class="login-input" type="password" autocomplete="current-password" required />
+
+        <div id="loginError" class="login-error" role="alert" aria-live="polite" hidden></div>
+
+        <button id="loginBtn" type="submit" class="login-btn">Anmelden</button>
+      </form>
+      <div class="login-hint">Konten werden manuell in Firebase angelegt.</div>
+    </div>
+  </div>
+
+  <main class="app" id="appRoot" hidden aria-hidden="true">
     <header class="toolbar" aria-label="Werkzeuge">
       <div class="swatches" id="swatches" role="radiogroup" aria-label="Markerfarben"></div>
 
@@ -44,11 +62,15 @@
         title="Info / Hilfe"
         aria-label="Info"
       >?</button>
-
-      <button id="clearBtn" type="button" class="clear-all" title="Löschen-Menü">
-        Clear
-      </button>
-    </header>
+      <div class="toolbar-right">
+        <button id="clearBtn" type="button" class="clear-all" title="Löschen-Menü">
+          Clear
+        </button>
+        <button id="logoutBtn" type="button" class="tool-btn wide" title="Abmelden" hidden>
+          Logout
+        </button>
+      </div>
+</header>
 
     <div id="scroller" class="scroller" aria-label="Kalender-Scroller">
       <div id="sentinel-top" class="sentinel" aria-hidden="true"></div>
@@ -202,6 +224,9 @@
   </div>
 
   <!-- Script-Reihenfolge ist wichtig (keine Module, läuft auch file:// stabil) -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+
   <script src="config.js"></script>
   <script src="utils.js"></script>
   <script src="storage.js"></script>
@@ -209,5 +234,6 @@
   <script src="calendar.js"></script>
   <script src="ui.js"></script>
   <script src="main.js"></script>
+  <script src="auth.js"></script>
 </body>
 </html>
