@@ -1,3 +1,10 @@
+wochenenden etwas dunkler, dort wo farben sind an wochenenden auch die farben etwas dunkler. (oder anders markiert? punkte oder so)
+
+wenn farbe zu dunkel wird die zahl weiss
+
+hexcode beim colorpicker
+colorpicker der auf dem bildschirm picken kann
+
 weniger einzele files
 
 

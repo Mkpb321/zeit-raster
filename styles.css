@@ -3,7 +3,7 @@
   color-scheme: light;
   --line:#000;
   --bg:#fff;
-  --weekend:#f0f0f0;
+  --weekend:#dddddd;
   /* Fixe UI-Farben (ohne Toggle/Regler)
      - Außen (hinter den Tabellen): schwarz
      - UI-/Chrome-Flächen: ~55% Grau

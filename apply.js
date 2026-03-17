@@ -12,6 +12,21 @@
   // Backwards-compat alias (alte Stellen im Code)
   A.isValidMarkerId = A.isValidColor;
 
+  const clampByte = (n) => Math.max(0, Math.min(255, Math.round(n)));
+
+  const darkenHex = (hex, amount = 0.18) => {
+    const c = normHex(hex);
+    if (!c) return null;
+
+    const ratio = Math.max(0, Math.min(1, Number(amount) || 0));
+    const r = parseInt(c.slice(1, 3), 16);
+    const g = parseInt(c.slice(3, 5), 16);
+    const b = parseInt(c.slice(5, 7), 16);
+
+    const toHex = (v) => clampByte(v).toString(16).padStart(2, "0");
+    return `#${toHex(r * (1 - ratio))}${toHex(g * (1 - ratio))}${toHex(b * (1 - ratio))}`;
+  };
+
   A.applyMarkerToCell = (cell, colorOrNull) => {
     // Built-in Klassen entfernen (falls vorhanden)
     for (const m of CONFIG.MARKERS) cell.classList.remove(m.className);
@@ -29,8 +44,12 @@
 
     // Wir benutzen für ALLE Farben (auch built-in) die Custom-Variante,
     // damit die Speicherung immer nur den Farbcode benötigt.
+    // An Wochenenden wird nur die Darstellung leicht dunkler gemacht;
+    // gespeichert bleibt weiterhin immer die Originalfarbe.
+    const renderHex = cell.classList.contains("weekend-col") ? darkenHex(hex, 0.18) || hex : hex;
+
     cell.classList.add("marker-custom");
-    cell.style.setProperty("--m-custom", hex);
+    cell.style.setProperty("--m-custom", renderHex);
     cell.dataset.marker = hex;
   };
 
